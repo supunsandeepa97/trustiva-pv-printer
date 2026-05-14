@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($body = '{\"email\":\"admin@trustiva.lk\",\"password\":\"Admin@123\"}'; try { $r = Invoke-WebRequest -Uri \"http://localhost:4000/api/v1/auth/login\" -Method POST -Body $body -ContentType \"application/json\" -TimeoutSec 5 -UseBasicParsing; \"Status: $\\($r.StatusCode\\)`nBody: $\\($r.Content.Substring\\(0, [Math]::Min\\(200, $r.Content.Length\\)\\)\\)\" } catch { \"ERROR: $_\" })",
+      "PowerShell(& \"$env:USERPROFILE\\\\scoop\\\\apps\\\\postgresql\\\\current\\\\bin\\\\psql.exe\" -U postgres -d trustiva_pv -c \"SELECT password_hash FROM users WHERE email = 'admin@trustiva.lk';\" 2>&1)",
+      "PowerShell($body = '{\"email\":\"admin@trustiva.lk\",\"password\":\"Admin@123\"}'; try { $r = Invoke-WebRequest -Uri \"http://localhost:4000/api/v1/auth/login\" -Method POST -Body $body -ContentType \"application/json\" -TimeoutSec 5 -UseBasicParsing; \"OK - Status: $\\($r.StatusCode\\)\" } catch { \"FAIL: $_\" })",
+      "Bash(psql -U postgres -d trustiva_pv -c \"UPDATE voucher_templates SET config = jsonb_set\\(config, '{visible_fields}', \\('\\\\\"logo\\\\\"'::jsonb || \\(config->'visible_fields'\\)\\)::jsonb\\) WHERE id = '00000000-0000-0000-0000-000000000003' AND NOT \\(config->'visible_fields'\\) @> '\\\\\"logo\\\\\"'::jsonb;\")",
+      "PowerShell(& \"$env:USERPROFILE\\\\scoop\\\\shims\\\\psql.exe\" -U postgres -d trustiva_pv -c \"UPDATE voucher_templates SET config = jsonb_set\\(config, '{visible_fields}', \\('\"\"logo\"\"'::jsonb || \\(config->'visible_fields'\\)\\)::jsonb\\) WHERE id = '00000000-0000-0000-0000-000000000003' AND NOT \\(config->'visible_fields'\\) @> '\"\"logo\"\"'::jsonb RETURNING name, config->'visible_fields' as fields;\")",
+      "PowerShell(Get-Command psql -ErrorAction SilentlyContinue | Select-Object Source; \\(Get-ChildItem \"C:\\\\Users\\\\Staff\\\\scoop\" -Recurse -Filter \"psql.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1 FullName\\))",
+      "Read(//c/Users/Staff/Desktop/**)",
+      "Read(//c/Users/Staff/Downloads/**)",
+      "Read(//c/Users/Staff/**)",
+      "Bash(node -e ' *)",
+      "mcp__claude_ai_Supabase__get_project_url",
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); const pool = require\\('./src/config/database'\\); pool.query\\('SELECT NOW\\(\\)'\\).then\\(r => { console.log\\('Connected to Supabase:', r.rows[0].now\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\('Connection failed:', e.message\\); process.exit\\(1\\); }\\);\")",
+      "Bash(curl -s --max-time 5 https://api.supabase.com/v1/projects)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); const pool = require\\('./src/config/database'\\); pool.query\\('SELECT NOW\\(\\)'\\).then\\(r => { console.log\\('Connected:', r.rows[0].now\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\('Failed:', e.message\\); process.exit\\(1\\); }\\);\")",
+      "Bash(nslookup db.ilxbsselaxbscsvykmvr.supabase.co)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); const pool = require\\('./src/config/database'\\); pool.query\\('SELECT NOW\\(\\)'\\).then\\(r => { console.log\\('Connected to Neon:', r.rows[0].now\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\('Failed:', e.message\\); process.exit\\(1\\); }\\);\")",
+      "Bash(xargs wc *)",
+      "Bash(curl -s -X POST http://localhost:4000/api/v1/auth/signup-request -H \"Content-Type: application/json\" -d \"{\\\\\"name\\\\\":\\\\\"Test User\\\\\",\\\\\"email\\\\\":\\\\\"testuser@example.com\\\\\",\\\\\"password\\\\\":\\\\\"Test@123\\\\\",\\\\\"role\\\\\":\\\\\"finance_user\\\\\",\\\\\"message\\\\\":\\\\\"Testing signup flow\\\\\"}\")",
+      "Bash(curl -s -X POST http://localhost:4000/api/v1/auth/login -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"testuser@example.com\\\\\",\\\\\"password\\\\\":\\\\\"Test@123\\\\\"}\")",
+      "Bash(gh auth *)",
+      "Bash(git -C \"c:\\\\Users\\\\Staff\\\\Documents\\\\Antigravity\\\\Trustiva PV Printer\" remote -v)",
+      "Bash(git config *)",
+      "Bash(git -C \"c:\\\\Users\\\\Staff\\\\Documents\\\\Antigravity\\\\Trustiva PV Printer\" rev-parse --show-toplevel)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Staff\\.claude\\plans"
+    ]
+  }
+}

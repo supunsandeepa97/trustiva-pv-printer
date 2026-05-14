@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@500;600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy:   #0F172A;
+  --gold:   #C9A227;
+  --gold-light: #DDB820;
+  --gold-dim:   rgba(201,162,39,0.15);
+  --slate:  #F1F5F9;
+  --white:  #FFFFFF;
+  --emerald:#10B981;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #F1F5F9;
+    color: #0F172A;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3 {
+    font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass {
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  .glass-white {
+    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+  .gradient-navy {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #0F172A 100%);
+  }
+  .text-gold { color: var(--gold); }
+  .bg-gold   { background-color: var(--gold); }
+  .border-gold { border-color: var(--gold); }
+  .text-balance { text-wrap: balance; }
+
+  /* Gold shimmer for decorative use */
+  .gold-shimmer {
+    background: linear-gradient(90deg, #C9A227 0%, #F0CE35 40%, #C9A227 60%, #A07D1A 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* ── Print CSS ─────────────────────────────────────────────── */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  @page { margin: 0; }
+  body { margin: 0; background: white; }
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #F1F5F9; }
+::-webkit-scrollbar-thumb { background: #C9A227; border-radius: 3px; opacity: 0.5; }
+::-webkit-scrollbar-thumb:hover { background: #A07D1A; }
+
+/* ── Sidebar item states ─────────────────────────────────────── */
+.sidebar-item {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer select-none;
+}
+.sidebar-item:hover {
+  background: rgba(201, 162, 39, 0.12);
+  color: #F0CE35;
+}
+.sidebar-item.active {
+  background: linear-gradient(135deg, #C9A227 0%, #DDB820 100%);
+  color: #0F172A;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(201,162,39,0.4);
+}
+.sidebar-item.inactive { @apply text-slate-400; }

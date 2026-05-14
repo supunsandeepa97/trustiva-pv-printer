@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\({ path: 'c:/Users/Staff/Documents/Antigravity/Trustiva PV Printer/backend/.env.example' }\\); const app = require\\('c:/Users/Staff/Documents/Antigravity/Trustiva PV Printer/backend/src/index.js'\\); console.log\\('Backend loaded OK'\\);\")",
+      "Bash(node -e \"require\\('./src/index.js'\\)\")",
+      "Bash(kill %1)",
+      "Bash(node --check src/index.js)",
+      "Bash(node --check src/services/importEngine.js)",
+      "Bash(node --check src/services/pdfService.js)",
+      "Bash(node --check src/services/voucherService.js)",
+      "Bash(node --check src/services/amountWords.js)",
+      "Bash(node --check src/controllers/authController.js)",
+      "Bash(node --check src/controllers/importController.js)",
+      "Bash(node --check src/controllers/paymentController.js)",
+      "Bash(node --check src/controllers/printController.js)",
+      "Bash(node --check src/controllers/templateController.js)",
+      "Bash(npx tsc *)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 25516\")",
+      "PowerShell(Get-Process -Id 25516 -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

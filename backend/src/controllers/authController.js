@@ -1,0 +1,232 @@
+const bcrypt   = require('bcryptjs');
+const pool     = require('../config/database');
+const { sign, signRefresh, verifyRefresh } = require('../config/jwt');
+const { success, error } = require('../utils/apiResponse');
+const { sendSignupRequestEmail } = require('../services/mailerService');
+
+async function login(req, res, next) {
+  try {
+    const { email, password } = req.body;
+    const result = await pool.query(
+      `SELECT u.*, c.name AS company_name
+       FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.email = $1`,
+      [email.toLowerCase().trim()]
+    );
+    const user = result.rows[0];
+    if (!user) return error(res, 'Invalid email or password', 401);
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return error(res, 'Invalid email or password', 401);
+
+    if (user.approval_status === 'pending')  return error(res, 'Your account is pending admin approval.', 403);
+    if (user.approval_status === 'rejected') return error(res, 'Your access request was declined. Contact the administrator.', 403);
+    if (!user.is_active) return error(res, 'Your account has been deactivated. Contact the administrator.', 403);
+
+    const payload = {
+      id:           user.id,
+      company_id:   user.company_id,
+      company_name: user.company_name,
+      name:         user.name,
+      email:        user.email,
+      role:         user.role,
+    };
+
+    const token        = sign(payload);
+    const refreshToken = signRefresh({ id: user.id, company_id: user.company_id });
+
+    return success(res, { token, refreshToken, user: payload });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function register(req, res, next) {
+  try {
+    const { name, email, password, role = 'finance_user' } = req.body;
+    const hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (company_id, name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role`,
+      [req.user.company_id, name, email.toLowerCase().trim(), hash, role]
+    );
+    return success(res, result.rows[0], 201);
+  } catch (err) {
+    if (err.code === '23505') return error(res, 'Email already registered', 409);
+    next(err);
+  }
+}
+
+async function refreshToken(req, res, next) {
+  try {
+    const { refreshToken: token } = req.body;
+    if (!token) return error(res, 'Refresh token required', 400);
+
+    let payload;
+    try {
+      payload = verifyRefresh(token);
+    } catch {
+      return error(res, 'Invalid or expired refresh token', 401);
+    }
+
+    const result = await pool.query(
+      `SELECT u.*, c.name AS company_name FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.id = $1 AND u.is_active = TRUE`,
+      [payload.id]
+    );
+    const user = result.rows[0];
+    if (!user) return error(res, 'User not found', 401);
+
+    const newPayload = {
+      id:           user.id,
+      company_id:   user.company_id,
+      company_name: user.company_name,
+      name:         user.name,
+      email:        user.email,
+      role:         user.role,
+    };
+
+    return success(res, { token: sign(newPayload), user: newPayload });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
+    const result = await pool.query(
+      'SELECT id, company_id FROM users WHERE email = $1 AND is_active = TRUE',
+      [email.toLowerCase().trim()]
+    );
+    if (!result.rows[0]) {
+      // Return success anyway to prevent email enumeration
+      return success(res, { message: 'If that email exists, an OTP has been sent.' });
+    }
+
+    const otp     = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const user    = result.rows[0];
+
+    await pool.query(
+      `INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)
+       ON CONFLICT (company_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [user.company_id, `otp_${user.id}`, JSON.stringify({ otp, expires })]
+    );
+
+    // In production: send email with OTP. For now, log it.
+    console.log(`[OTP] ${email}: ${otp} (expires ${expires})`);
+
+    return success(res, { message: 'If that email exists, an OTP has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { email, otp, password } = req.body;
+    const userResult = await pool.query(
+      'SELECT id, company_id FROM users WHERE email = $1 AND is_active = TRUE',
+      [email.toLowerCase().trim()]
+    );
+    const user = userResult.rows[0];
+    if (!user) return error(res, 'Invalid request', 400);
+
+    const settingResult = await pool.query(
+      'SELECT value FROM settings WHERE company_id = $1 AND key = $2',
+      [user.company_id, `otp_${user.id}`]
+    );
+    if (!settingResult.rows[0]) return error(res, 'No OTP found. Please request a new one.', 400);
+
+    const { otp: storedOtp, expires } = JSON.parse(settingResult.rows[0].value);
+    if (new Date() > new Date(expires)) return error(res, 'OTP has expired', 400);
+    if (otp !== storedOtp) return error(res, 'Invalid OTP', 400);
+
+    const hash = await bcrypt.hash(password, 12);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+      [hash, user.id]
+    );
+    await pool.query(
+      'DELETE FROM settings WHERE company_id = $1 AND key = $2',
+      [user.company_id, `otp_${user.id}`]
+    );
+
+    return success(res, { message: 'Password reset successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getMe(req, res, next) {
+  try {
+    const result = await pool.query(
+      'SELECT id, company_id, name, email, role, created_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    return success(res, result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function signupRequest(req, res, next) {
+  try {
+    const { name, email, password, role = 'finance_user', message = '' } = req.body;
+    if (!name || !email || !password) return error(res, 'Name, email and password are required', 400);
+
+    const defaultCompany = await pool.query('SELECT id FROM companies LIMIT 1');
+    if (!defaultCompany.rows[0]) return error(res, 'System not configured', 500);
+    const company_id = defaultCompany.rows[0].id;
+
+    const hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (company_id, name, email, password_hash, role, is_active, approval_status)
+       VALUES ($1, $2, $3, $4, $5, FALSE, 'pending')
+       RETURNING id, name, email, role`,
+      [company_id, name.trim(), email.toLowerCase().trim(), hash, role]
+    );
+
+    await sendSignupRequestEmail({ name: name.trim(), email: email.toLowerCase().trim(), role, message });
+
+    return success(res, { message: 'Request submitted. Awaiting admin approval.' }, 201);
+  } catch (err) {
+    if (err.code === '23505') return error(res, 'That email address is already registered.', 409);
+    next(err);
+  }
+}
+
+async function approveUser(req, res, next) {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET approval_status = 'approved', is_active = TRUE, updated_at = NOW()
+       WHERE id = $1 AND company_id = $2
+       RETURNING id, name, email, role, approval_status, is_active`,
+      [req.params.id, req.user.company_id]
+    );
+    if (!result.rows[0]) return error(res, 'User not found', 404);
+    return success(res, result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function rejectUser(req, res, next) {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET approval_status = 'rejected', is_active = FALSE, updated_at = NOW()
+       WHERE id = $1 AND company_id = $2
+       RETURNING id, name, email, role, approval_status, is_active`,
+      [req.params.id, req.user.company_id]
+    );
+    if (!result.rows[0]) return error(res, 'User not found', 404);
+    return success(res, result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, register, refreshToken, forgotPassword, resetPassword, getMe, signupRequest, approveUser, rejectUser };
