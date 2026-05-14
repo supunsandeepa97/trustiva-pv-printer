@@ -179,28 +179,38 @@ async function getMe(req, res, next) {
 }
 
 async function signupRequest(req, res, next) {
+  const client = await pool.connect();
   try {
-    const { name, email, password, role = 'finance_user', message = '' } = req.body;
-    if (!name || !email || !password) return error(res, 'Name, email and password are required', 400);
+    const { name, email, password, role = 'finance_user', message = '', company_name } = req.body;
+    if (!name || !email || !password || !company_name)
+      return error(res, 'Company name, your name, email and password are required', 400);
 
-    const defaultCompany = await pool.query('SELECT id FROM companies LIMIT 1');
-    if (!defaultCompany.rows[0]) return error(res, 'System not configured', 500);
-    const company_id = defaultCompany.rows[0].id;
+    await client.query('BEGIN');
+
+    const companyResult = await client.query(
+      `INSERT INTO companies (name) VALUES ($1) RETURNING id`,
+      [company_name.trim()]
+    );
+    const company_id = companyResult.rows[0].id;
 
     const hash = await bcrypt.hash(password, 12);
-    const result = await pool.query(
+    await client.query(
       `INSERT INTO users (company_id, name, email, password_hash, role, is_active, approval_status)
-       VALUES ($1, $2, $3, $4, $5, FALSE, 'pending')
-       RETURNING id, name, email, role`,
+       VALUES ($1, $2, $3, $4, $5, FALSE, 'pending')`,
       [company_id, name.trim(), email.toLowerCase().trim(), hash, role]
     );
 
-    await sendSignupRequestEmail({ name: name.trim(), email: email.toLowerCase().trim(), role, message });
+    await client.query('COMMIT');
+
+    await sendSignupRequestEmail({ name: name.trim(), email: email.toLowerCase().trim(), role, message, company_name: company_name.trim() });
 
     return success(res, { message: 'Request submitted. Awaiting admin approval.' }, 201);
   } catch (err) {
+    await client.query('ROLLBACK');
     if (err.code === '23505') return error(res, 'That email address is already registered.', 409);
     next(err);
+  } finally {
+    client.release();
   }
 }
 
@@ -208,9 +218,9 @@ async function approveUser(req, res, next) {
   try {
     const result = await pool.query(
       `UPDATE users SET approval_status = 'approved', is_active = TRUE, updated_at = NOW()
-       WHERE id = $1 AND company_id = $2
+       WHERE id = $1
        RETURNING id, name, email, role, approval_status, is_active`,
-      [req.params.id, req.user.company_id]
+      [req.params.id]
     );
     if (!result.rows[0]) return error(res, 'User not found', 404);
     return success(res, result.rows[0]);
@@ -223,9 +233,9 @@ async function rejectUser(req, res, next) {
   try {
     const result = await pool.query(
       `UPDATE users SET approval_status = 'rejected', is_active = FALSE, updated_at = NOW()
-       WHERE id = $1 AND company_id = $2
+       WHERE id = $1
        RETURNING id, name, email, role, approval_status, is_active`,
-      [req.params.id, req.user.company_id]
+      [req.params.id]
     );
     if (!result.rows[0]) return error(res, 'User not found', 404);
     return success(res, result.rows[0]);
@@ -234,4 +244,20 @@ async function rejectUser(req, res, next) {
   }
 }
 
-module.exports = { login, register, refreshToken, forgotPassword, resetPassword, getMe, signupRequest, approveUser, rejectUser };
+async function getPendingRequests(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, u.created_at, u.approval_status,
+              c.name AS company_name
+       FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.approval_status = 'pending'
+       ORDER BY u.created_at DESC`
+    );
+    return success(res, result.rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, register, refreshToken, forgotPassword, resetPassword, getMe, signupRequest, approveUser, rejectUser, getPendingRequests };

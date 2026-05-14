@@ -12,7 +12,7 @@ const ROLES = [
 ];
 
 export default function SignupPage() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'finance_user', message: '' });
+  const [form, setForm] = useState({ company_name: '', name: '', email: '', password: '', role: 'finance_user', message: '' });
   const [showPass, setShowPass]   = useState(false);
   const [loading,  setLoading]    = useState(false);
   const [error,    setError]      = useState('');
@@ -30,6 +30,7 @@ export default function SignupPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.company_name.trim()) { setError('Company name is required.'); return; }
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setLoading(true);
     setError('');
@@ -94,6 +95,18 @@ export default function SignupPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Company Name</label>
+                <input
+                  type="text" value={form.company_name} onChange={set('company_name')} required
+                  placeholder="Your company or organisation name"
+                  className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
+                  style={inputStyle}
+                  onFocus={e => { e.currentTarget.style.border = '1px solid rgba(201,162,39,0.7)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(201,162,39,0.12)'; }}
+                  onBlur={e  => { e.currentTarget.style.border = '1px solid rgba(201,162,39,0.2)'; e.currentTarget.style.boxShadow = 'none'; }}
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Full Name</label>
                 <input

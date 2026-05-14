@@ -71,10 +71,10 @@ export const AuthAPI = {
   forgotPassword:  (email: string)                   => api.post('/auth/forgot-password', { email }),
   resetPassword:   (data: object)                    => api.post('/auth/reset-password', data),
   me:              ()                                => api.get('/auth/me'),
-  signupRequest:   (data: object)                    => axios.post('/api/v1/auth/signup-request', data),
-  approveUser:     (id: string)                      => api.patch(`/auth/approve/${id}`),
-  rejectUser:      (id: string)                      => api.patch(`/auth/reject/${id}`),
-  pendingUsers:    ()                                => api.get('/company/users?approval_status=pending'),
+  signupRequest:       (data: object) => axios.post('/api/v1/auth/signup-request', data),
+  approveUser:         (id: string)   => api.patch(`/auth/approve/${id}`),
+  rejectUser:          (id: string)   => api.patch(`/auth/reject/${id}`),
+  getPendingRequests:  ()             => api.get('/auth/pending-requests'),
 };
 
 // ─── Company API ──────────────────────────────────────────────

@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { Save, Upload, Loader2, Users, Building, Palette, Printer, Landmark, Plus, Trash2, X, UserCheck, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { CompanyAPI, SettingsAPI, AuthAPI } from '@/lib/api';
+
+interface PendingUser { id: string; name: string; email: string; role: string; company_name: string; created_at: string; approval_status: string; }
 import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/layout/PageHeader';
@@ -23,6 +25,7 @@ export default function SettingsPage() {
   const [company,   setCompany]   = useState<Company | null>(null);
   const [settings,  setSettings]  = useState<Record<string, string>>({});
   const [users,        setUsers]        = useState<Array<{ id: string; name: string; email: string; role: string; is_active: boolean; approval_status: string; created_at: string }>>([]);
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [saving,    setSaving]    = useState(false);
   const [loading,   setLoading]   = useState(true);
@@ -44,10 +47,11 @@ export default function SettingsPage() {
         setSettings(s);
         try { setBanks(JSON.parse(s.bank_accounts || '[]')); } catch { setBanks([]); }
         if (isAllowed(['super_admin'])) {
-          const uRes = await CompanyAPI.getUsers();
-          const allUsers = uRes.data.data;
-          setUsers(allUsers);
-          setPendingCount(allUsers.filter((u: { approval_status: string }) => u.approval_status === 'pending').length);
+          const [uRes, pRes] = await Promise.all([CompanyAPI.getUsers(), AuthAPI.getPendingRequests()]);
+          setUsers(uRes.data.data);
+          const pending: PendingUser[] = pRes.data.data;
+          setPendingUsers(pending);
+          setPendingCount(pending.length);
         }
       } catch { notify({ type: 'error', message: 'Failed to load settings' }); }
       finally { setLoading(false); }
@@ -331,9 +335,7 @@ export default function SettingsPage() {
             <h3 className="font-semibold text-slate-900 mb-4">Pending Access Requests</h3>
             {!isAllowed(['super_admin']) ? (
               <p className="text-slate-500 text-sm">Only Super Admins can manage access requests.</p>
-            ) : (() => {
-              const pending = users.filter(u => u.approval_status === 'pending');
-              return pending.length === 0 ? (
+            ) : pendingUsers.length === 0 ? (
                 <div className="text-center py-12 border border-dashed border-slate-200 rounded-xl">
                   <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-emerald-400" />
                   <p className="text-slate-500 text-sm font-medium">No pending requests</p>
@@ -344,15 +346,16 @@ export default function SettingsPage() {
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        {['Name','Email','Role','Requested','Message','Actions'].map(h => (
+                        {['Company','Name','Email','Role','Requested','Actions'].map(h => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {pending.map(u => (
+                      {pendingUsers.map(u => (
                         <tr key={u.id} className="hover:bg-amber-50/40">
-                          <td className="px-4 py-3 font-medium text-slate-800">
+                          <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">{u.company_name}</td>
+                          <td className="px-4 py-3 font-medium text-slate-700">
                             <div className="flex items-center gap-2">
                               <Clock className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
                               {u.name}
@@ -360,17 +363,16 @@ export default function SettingsPage() {
                           </td>
                           <td className="px-4 py-3 text-slate-600">{u.email}</td>
                           <td className="px-4 py-3 capitalize text-slate-700">{u.role.replace(/_/g,' ')}</td>
-                          <td className="px-4 py-3 text-slate-500 text-xs">
+                          <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                             {new Date(u.created_at).toLocaleDateString('en-GB')}
                           </td>
-                          <td className="px-4 py-3 text-slate-500 text-xs max-w-[150px] truncate">—</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={async () => {
                                   try {
                                     await AuthAPI.approveUser(u.id);
-                                    setUsers(us => us.map(x => x.id === u.id ? { ...x, approval_status: 'approved', is_active: true } : x));
+                                    setPendingUsers(ps => ps.filter(x => x.id !== u.id));
                                     setPendingCount(c => Math.max(0, c - 1));
                                     notify({ type: 'success', message: `${u.name} approved` });
                                   } catch { notify({ type: 'error', message: 'Approval failed' }); }
@@ -383,7 +385,7 @@ export default function SettingsPage() {
                                 onClick={async () => {
                                   try {
                                     await AuthAPI.rejectUser(u.id);
-                                    setUsers(us => us.map(x => x.id === u.id ? { ...x, approval_status: 'rejected', is_active: false } : x));
+                                    setPendingUsers(ps => ps.filter(x => x.id !== u.id));
                                     setPendingCount(c => Math.max(0, c - 1));
                                     notify({ type: 'success', message: `${u.name} rejected` });
                                   } catch { notify({ type: 'error', message: 'Rejection failed' }); }
@@ -399,8 +401,7 @@ export default function SettingsPage() {
                     </tbody>
                   </table>
                 </div>
-              );
-            })()}
+              )}
           </div>
         )}
 

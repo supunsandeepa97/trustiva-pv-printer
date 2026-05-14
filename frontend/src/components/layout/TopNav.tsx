@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/hooks/useAuth';
-import { CompanyAPI } from '@/lib/api';
+import { AuthAPI } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -25,9 +25,8 @@ export default function TopNav() {
     if (!isSuperAdmin) return;
     async function fetchPending() {
       try {
-        const res = await CompanyAPI.getUsers();
-        const count = res.data.data.filter((u: { approval_status: string }) => u.approval_status === 'pending').length;
-        setPendingCount(count);
+        const res = await AuthAPI.getPendingRequests();
+        setPendingCount(res.data.data.length);
       } catch { /* silent */ }
     }
     fetchPending();
