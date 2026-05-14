@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePayments } from '@/hooks/usePayments';
 import { usePaymentsStore } from '@/store/paymentsStore';
+import { useAuth } from '@/hooks/useAuth';
 import PaymentTable   from '@/components/payments/PaymentTable';
 import PaymentFilters from '@/components/payments/PaymentFilters';
 import BulkActions    from '@/components/payments/BulkActions';
@@ -10,10 +12,15 @@ import PageHeader     from '@/components/layout/PageHeader';
 import { formatCurrency } from '@/lib/utils';
 
 export default function PaymentHistoryPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const { fetchVouchers } = usePayments();
   const { total, page, limit, filters, setFilters, vouchers } = usePaymentsStore();
 
+  useEffect(() => { if (user?.is_platform_admin) router.replace('/admin'); }, [user]);
+
   useEffect(() => {
+    if (user?.is_platform_admin) return;
     fetchVouchers({ page: 1, limit: 20, sort: 'date', order: 'DESC' });
   }, []);
 

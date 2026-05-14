@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Save, Upload, Loader2, Users, Building, Palette, Printer, Landmark, Plus, Trash2, X, UserCheck, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { CompanyAPI, SettingsAPI, AuthAPI } from '@/lib/api';
 
@@ -19,9 +20,11 @@ interface BankAccount {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const notify = useUIStore(s => s.addNotification);
-  const { isAllowed } = useAuth();
+  const { user, isAllowed } = useAuth();
   const canEditCompany = isAllowed(['super_admin', 'finance_manager']);
+  useEffect(() => { if (user?.is_platform_admin) router.replace('/admin'); }, [user]);
   const [activeTab, setActiveTab] = useState<Tab>('company');
   const [company,   setCompany]   = useState<Company | null>(null);
   const [settings,  setSettings]  = useState<Record<string, string>>({});

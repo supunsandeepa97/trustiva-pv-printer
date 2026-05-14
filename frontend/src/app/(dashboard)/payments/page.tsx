@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import { useReactToPrint } from 'react-to-print';
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react';
 import { ImportAPI, PaymentAPI, CompanyAPI, TemplateAPI, SettingsAPI } from '@/lib/api';
 import { useUIStore } from '@/store/uiStore';
+import { useAuth } from '@/hooks/useAuth';
 import VoucherA5 from '@/components/voucher/VoucherA5';
 import ChequeSlip from '@/components/voucher/ChequeSlip';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -68,7 +70,10 @@ function StepBar({ current }: { current: Step }) {
 
 /* ─── Main page ─────────────────────────────────────────────── */
 export default function PaymentPrintPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const notify = useUIStore(s => s.addNotification);
+  useEffect(() => { if (user?.is_platform_admin) router.replace('/admin'); }, [user]);
 
   const [step,        setStep]        = useState<Step>(1);
   const [company,     setCompany]     = useState<Company | null>(null);

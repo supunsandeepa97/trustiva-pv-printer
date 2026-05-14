@@ -66,7 +66,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-1" aria-label="Main navigation">
-        {NAV_ITEMS.filter(item => !item.platformOnly || user?.is_platform_admin).map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.filter(item => user?.is_platform_admin ? item.platformOnly : !item.platformOnly).map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link key={href} href={href} title={!sidebarOpen ? label : undefined} aria-current={active ? 'page' : undefined}>

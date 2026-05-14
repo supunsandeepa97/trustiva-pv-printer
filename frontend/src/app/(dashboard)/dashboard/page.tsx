@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, FileText, Printer, Clock, TrendingUp } from 'lucide-react';
 import { DashboardAPI } from '@/lib/api';
 import { useUIStore } from '@/store/uiStore';
+import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils';
 import StatsCard   from '@/components/dashboard/StatsCard';
 import Charts      from '@/components/dashboard/Charts';
@@ -26,11 +28,16 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const notify = useUIStore(s => s.addNotification);
   const [data,    setData]    = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => { if (user?.is_platform_admin) router.replace('/admin'); }, [user]);
+
   useEffect(() => {
+    if (user?.is_platform_admin) return;
     DashboardAPI.getStats()
       .then(r => setData(r.data.data))
       .catch(() => notify({ type: 'error', message: 'Failed to load dashboard data' }))
