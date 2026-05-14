@@ -6,6 +6,8 @@ const helmet       = require('helmet');
 const path         = require('path');
 const rateLimit    = require('express-rate-limit');
 const errorHandler = require('./middleware/error');
+const pool         = require('./config/database');
+const { startBackupService, runBackup } = require('./services/backupService');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -46,8 +48,29 @@ app.use('/api/v1/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/v1/platform',  require('./routes/platformRoutes'));
 
 // ─── Health check ────────────────────────────────────────────
-app.get('/api/v1/health', (req, res) => {
-  res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
+app.get('/api/v1/health', async (req, res) => {
+  let dbOk = false;
+  try { await pool.query('SELECT 1'); dbOk = true; } catch { /* down */ }
+  const status = dbOk ? 'ok' : 'degraded';
+  res.status(dbOk ? 200 : 503).json({
+    success: dbOk,
+    data: {
+      status,
+      db:        dbOk ? (pool._usingBackup ? 'backup' : 'primary') : 'down',
+      backup:    pool._backup ? 'configured' : 'not configured',
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// ─── Manual backup trigger (internal use) ────────────────────
+app.post('/api/v1/backup/run', async (req, res) => {
+  const secret = req.headers['x-backup-secret'];
+  if (!secret || secret !== process.env.BACKUP_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  runBackup().catch(console.error);
+  res.json({ success: true, data: { message: 'Backup started in background' } });
 });
 
 // ─── 404 ────────────────────────────────────────────────────
@@ -61,6 +84,7 @@ app.use(errorHandler);
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`TRUSTIVA PRINTER backend running on http://localhost:${PORT}`);
+    startBackupService();
   });
 }
 
