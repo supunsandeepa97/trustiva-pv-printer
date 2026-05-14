@@ -137,6 +137,12 @@ export const DashboardAPI = {
   getStats: () => api.get('/dashboard'),
 };
 
+// ─── Platform API (platform admin only) ───────────────────────
+export const PlatformAPI = {
+  listCompanies:  ()          => api.get('/platform/companies'),
+  toggleCompany:  (id: string) => api.patch(`/platform/companies/${id}/toggle`),
+};
+
 // ─── Settings API ─────────────────────────────────────────────
 export const SettingsAPI = {
   get:    ()              => api.get('/settings'),

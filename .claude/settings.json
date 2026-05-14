@@ -26,7 +26,16 @@
       "Bash(git config *)",
       "Bash(git -C \"c:\\\\Users\\\\Staff\\\\Documents\\\\Antigravity\\\\Trustiva PV Printer\" rev-parse --show-toplevel)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git branch *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(node -e \"const c=require\\('crypto'\\); console.log\\('JWT_SECRET='+c.randomBytes\\(48\\).toString\\('hex'\\)\\); console.log\\('JWT_REFRESH_SECRET='+c.randomBytes\\(48\\).toString\\('hex'\\)\\);\")",
+      "WebFetch(domain:trustiva-pv-printer.vercel.app)",
+      "Bash(python3 \"C:\\\\Users\\\\Staff\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"enterprise finance dashboard payment voucher print SaaS dark professional\" --design-system -p \"Trustiva Print Suite\")",
+      "Bash(python \"C:\\\\Users\\\\Staff\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"enterprise finance dashboard payment voucher print SaaS dark professional\" --design-system -p \"Trustiva Print Suite\")",
+      "Bash(npm run *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Staff\\.claude\\plans"

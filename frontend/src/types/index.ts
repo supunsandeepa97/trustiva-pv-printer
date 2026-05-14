@@ -11,6 +11,7 @@ export interface User {
   email: string;
   role: Role;
   is_active?: boolean;
+  is_platform_admin?: boolean;
   approval_status?: 'pending' | 'approved' | 'rejected';
   created_at?: string;
 }
@@ -25,7 +26,21 @@ export interface Company {
   logo_url?: string;
   watermark_url?: string;
   settings?: Record<string, string>;
+  is_active?: boolean;
   created_at?: string;
+}
+
+export interface PlatformCompany {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  is_active: boolean;
+  created_at: string;
+  user_count: number;
+  voucher_count: number;
+  total_amount: number;
+  last_activity?: string;
 }
 
 export interface TemplateConfig {

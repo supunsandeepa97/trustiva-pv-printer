@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS companies (
   logo_url      TEXT,
   watermark_url TEXT,
   settings      JSONB DEFAULT '{}'::JSONB,
+  is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -32,7 +33,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role          TEXT NOT NULL DEFAULT 'finance_user'
                   CHECK (role IN ('super_admin','finance_manager','finance_user','viewer')),
-  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+  is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+  is_platform_admin   BOOLEAN NOT NULL DEFAULT FALSE,
   approval_status TEXT NOT NULL DEFAULT 'approved'
                     CHECK (approval_status IN ('pending','approved','rejected')),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -3,14 +3,17 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Printer, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Printer, Settings, LogOut, ChevronLeft, ChevronRight, LayoutDashboard, History, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { href: '/payments', label: 'Payment Print', icon: Printer  },
-  { href: '/settings', label: 'Settings',      icon: Settings },
+  { href: '/dashboard', label: 'Dashboard',       icon: LayoutDashboard, platformOnly: false },
+  { href: '/payments',  label: 'Payment Print',   icon: Printer,         platformOnly: false },
+  { href: '/history',   label: 'Payment History', icon: History,         platformOnly: false },
+  { href: '/settings',  label: 'Settings',        icon: Settings,        platformOnly: false },
+  { href: '/admin',     label: 'Platform Admin',  icon: ShieldCheck,     platformOnly: true  },
 ];
 
 export default function Sidebar() {
@@ -63,7 +66,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-1" aria-label="Main navigation">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.filter(item => !item.platformOnly || user?.is_platform_admin).map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link key={href} href={href} title={!sidebarOpen ? label : undefined} aria-current={active ? 'page' : undefined}>

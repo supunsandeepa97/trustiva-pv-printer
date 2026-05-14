@@ -43,6 +43,7 @@ app.use('/api/v1/print',     require('./routes/printRoutes'));
 app.use('/api/v1/templates', require('./routes/templateRoutes'));
 app.use('/api/v1/settings',  require('./routes/settingsRoutes'));
 app.use('/api/v1/dashboard', require('./routes/dashboardRoutes'));
+app.use('/api/v1/platform',  require('./routes/platformRoutes'));
 
 // ─── Health check ────────────────────────────────────────────
 app.get('/api/v1/health', (req, res) => {

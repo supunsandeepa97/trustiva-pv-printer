@@ -14,5 +14,7 @@ router.post('/signup-request',   auth.signupRequest);
 router.get('/pending-requests',  verifyToken, requireRole(['super_admin']), auth.getPendingRequests);
 router.patch('/approve/:id',     verifyToken, requireRole(['super_admin']), auth.approveUser);
 router.patch('/reject/:id',      verifyToken, requireRole(['super_admin']), auth.rejectUser);
+// Note: requireRole(['super_admin']) allows both company super_admin AND platform admin
+// (platform admin always has role='super_admin' on their own company)
 
 module.exports = router;

@@ -1,27 +1,33 @@
 -- TRUSTIVA PRINTER — Seed Data
 -- Run after schema.sql
 
--- Default company
-INSERT INTO companies (id, name, address, phone, email, tax_number)
+-- Default company (platform owner's company)
+INSERT INTO companies (id, name, address, phone, email, tax_number, is_active)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
   'TRUSTIVA (PVT) LTD',
   'No. 1, Finance Street, Colombo 03, Sri Lanka',
   '+94 11 234 5678',
   'finance@trustiva.lk',
-  'VAT-123456789'
+  'VAT-123456789',
+  TRUE
 ) ON CONFLICT (id) DO NOTHING;
 
--- Default super admin
-INSERT INTO users (id, company_id, name, email, password_hash, role)
+-- Platform admin
+INSERT INTO users (id, company_id, name, email, password_hash, role, is_platform_admin)
 VALUES (
   '00000000-0000-0000-0000-000000000002',
   '00000000-0000-0000-0000-000000000001',
   'Super Admin',
   'supunsandeepa@yahoo.com',
   '$2a$12$82uewTxI/sgVupapq8HE0Ox/ysVnikeNpqJEf6gwbv/lE.8O.mRve',
-  'super_admin'
+  'super_admin',
+  TRUE
 ) ON CONFLICT DO NOTHING;
+
+-- Ensure platform admin flag is set on existing rows (idempotent)
+UPDATE users SET is_platform_admin = TRUE WHERE email = 'supunsandeepa@yahoo.com';
+UPDATE companies SET is_active = TRUE WHERE id = '00000000-0000-0000-0000-000000000001';
 
 -- Default voucher template (Standard A5)
 INSERT INTO voucher_templates (id, company_id, name, config, paper_size, is_default)

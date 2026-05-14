@@ -25,4 +25,11 @@ function requireRole(roles) {
   };
 }
 
-module.exports = { verifyToken, requireRole };
+function requirePlatformAdmin(req, res, next) {
+  if (!req.user?.is_platform_admin) {
+    return error(res, 'Platform admin access required', 403);
+  }
+  next();
+}
+
+module.exports = { verifyToken, requireRole, requirePlatformAdmin };

@@ -2,15 +2,20 @@
 import { usePathname } from 'next/navigation';
 import { Menu, Bell, LogOut, Settings, ChevronDown, UserCheck } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthAPI } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import NotificationsPanel from '@/components/layout/NotificationsPanel';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/payments': 'Payment Print',
-  '/settings': 'Settings',
+  '/dashboard': 'Dashboard',
+  '/payments':  'Payment Print',
+  '/history':   'Payment History',
+  '/settings':  'Settings',
+  '/admin':     'Platform Administration',
 };
 
 export default function TopNav() {
@@ -18,7 +23,9 @@ export default function TopNav() {
   const { toggleSidebar, notifications } = useUIStore();
   const { user, logout } = useAuth();
   const [menuOpen,      setMenuOpen]      = useState(false);
+  const [bellOpen,      setBellOpen]      = useState(false);
   const [pendingCount,  setPendingCount]  = useState(0);
+  const bellRef = useRef<HTMLDivElement>(null);
   const isSuperAdmin = user?.role === 'super_admin';
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -74,17 +81,27 @@ export default function TopNav() {
         )}
 
         {/* Notifications bell */}
-        <button aria-label="Notifications" className="relative text-slate-500 hover:text-slate-800 transition p-1.5 rounded-lg">
-          <Bell className="w-5 h-5" />
-          {notifications.length > 0 && (
-            <span
-              className="absolute -top-0.5 -right-0.5 w-4 h-4 text-[10px] font-bold rounded-full flex items-center justify-center"
-              style={{ background: '#C9A227', color: '#0F172A' }}
-            >
-              {notifications.length}
-            </span>
-          )}
-        </button>
+        <div className="relative" ref={bellRef}>
+          <button
+            aria-label="Notifications"
+            aria-expanded={bellOpen}
+            onClick={() => setBellOpen(o => !o)}
+            className="relative text-slate-500 hover:text-slate-800 transition p-1.5 rounded-lg"
+          >
+            <Bell className="w-5 h-5" />
+            {notifications.length > 0 && (
+              <span
+                className="absolute -top-0.5 -right-0.5 w-4 h-4 text-[10px] font-bold rounded-full flex items-center justify-center"
+                style={{ background: '#C9A227', color: '#0F172A' }}
+              >
+                {notifications.length}
+              </span>
+            )}
+          </button>
+          <AnimatePresence>
+            {bellOpen && <NotificationsPanel onClose={() => setBellOpen(false)} />}
+          </AnimatePresence>
+        </div>
 
         {/* User menu */}
         <div className="relative" ref={menuRef}>

@@ -8,7 +8,7 @@ async function login(req, res, next) {
   try {
     const { email, password } = req.body;
     const result = await pool.query(
-      `SELECT u.*, c.name AS company_name
+      `SELECT u.*, c.name AS company_name, c.is_active AS company_is_active
        FROM users u
        JOIN companies c ON c.id = u.company_id
        WHERE u.email = $1`,
@@ -23,14 +23,16 @@ async function login(req, res, next) {
     if (user.approval_status === 'pending')  return error(res, 'Your account is pending admin approval.', 403);
     if (user.approval_status === 'rejected') return error(res, 'Your access request was declined. Contact the administrator.', 403);
     if (!user.is_active) return error(res, 'Your account has been deactivated. Contact the administrator.', 403);
+    if (!user.company_is_active) return error(res, 'Your company account is inactive. Please contact support.', 403);
 
     const payload = {
-      id:           user.id,
-      company_id:   user.company_id,
-      company_name: user.company_name,
-      name:         user.name,
-      email:        user.email,
-      role:         user.role,
+      id:                user.id,
+      company_id:        user.company_id,
+      company_name:      user.company_name,
+      name:              user.name,
+      email:             user.email,
+      role:              user.role,
+      is_platform_admin: user.is_platform_admin || false,
     };
 
     const token        = sign(payload);
@@ -80,12 +82,13 @@ async function refreshToken(req, res, next) {
     if (!user) return error(res, 'User not found', 401);
 
     const newPayload = {
-      id:           user.id,
-      company_id:   user.company_id,
-      company_name: user.company_name,
-      name:         user.name,
-      email:        user.email,
-      role:         user.role,
+      id:                user.id,
+      company_id:        user.company_id,
+      company_name:      user.company_name,
+      name:              user.name,
+      email:             user.email,
+      role:              user.role,
+      is_platform_admin: user.is_platform_admin || false,
     };
 
     return success(res, { token: sign(newPayload), user: newPayload });
@@ -181,7 +184,7 @@ async function getMe(req, res, next) {
 async function signupRequest(req, res, next) {
   const client = await pool.connect();
   try {
-    const { name, email, password, role = 'finance_user', message = '', company_name } = req.body;
+    const { name, email, password, message = '', company_name } = req.body;
     if (!name || !email || !password || !company_name)
       return error(res, 'Company name, your name, email and password are required', 400);
 
@@ -194,15 +197,16 @@ async function signupRequest(req, res, next) {
     const company_id = companyResult.rows[0].id;
 
     const hash = await bcrypt.hash(password, 12);
+    // First user of a new company always becomes super_admin (company owner)
     await client.query(
       `INSERT INTO users (company_id, name, email, password_hash, role, is_active, approval_status)
-       VALUES ($1, $2, $3, $4, $5, FALSE, 'pending')`,
-      [company_id, name.trim(), email.toLowerCase().trim(), hash, role]
+       VALUES ($1, $2, $3, $4, 'super_admin', FALSE, 'pending')`,
+      [company_id, name.trim(), email.toLowerCase().trim(), hash]
     );
 
     await client.query('COMMIT');
 
-    await sendSignupRequestEmail({ name: name.trim(), email: email.toLowerCase().trim(), role, message, company_name: company_name.trim() });
+    await sendSignupRequestEmail({ name: name.trim(), email: email.toLowerCase().trim(), role: 'super_admin', message, company_name: company_name.trim() });
 
     return success(res, { message: 'Request submitted. Awaiting admin approval.' }, 201);
   } catch (err) {
@@ -216,13 +220,17 @@ async function signupRequest(req, res, next) {
 
 async function approveUser(req, res, next) {
   try {
-    const result = await pool.query(
-      `UPDATE users SET approval_status = 'approved', is_active = TRUE, updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, name, email, role, approval_status, is_active`,
-      [req.params.id]
-    );
-    if (!result.rows[0]) return error(res, 'User not found', 404);
+    // Platform admin can approve anyone; company super_admin only within their company
+    const query = req.user.is_platform_admin
+      ? `UPDATE users SET approval_status = 'approved', is_active = TRUE, updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, name, email, role, approval_status, is_active`
+      : `UPDATE users SET approval_status = 'approved', is_active = TRUE, updated_at = NOW()
+         WHERE id = $1 AND company_id = $2
+         RETURNING id, name, email, role, approval_status, is_active`;
+    const params = req.user.is_platform_admin ? [req.params.id] : [req.params.id, req.user.company_id];
+    const result = await pool.query(query, params);
+    if (!result.rows[0]) return error(res, 'User not found or access denied', 404);
     return success(res, result.rows[0]);
   } catch (err) {
     next(err);
@@ -231,13 +239,16 @@ async function approveUser(req, res, next) {
 
 async function rejectUser(req, res, next) {
   try {
-    const result = await pool.query(
-      `UPDATE users SET approval_status = 'rejected', is_active = FALSE, updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, name, email, role, approval_status, is_active`,
-      [req.params.id]
-    );
-    if (!result.rows[0]) return error(res, 'User not found', 404);
+    const query = req.user.is_platform_admin
+      ? `UPDATE users SET approval_status = 'rejected', is_active = FALSE, updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, name, email, role, approval_status, is_active`
+      : `UPDATE users SET approval_status = 'rejected', is_active = FALSE, updated_at = NOW()
+         WHERE id = $1 AND company_id = $2
+         RETURNING id, name, email, role, approval_status, is_active`;
+    const params = req.user.is_platform_admin ? [req.params.id] : [req.params.id, req.user.company_id];
+    const result = await pool.query(query, params);
+    if (!result.rows[0]) return error(res, 'User not found or access denied', 404);
     return success(res, result.rows[0]);
   } catch (err) {
     next(err);
@@ -246,14 +257,29 @@ async function rejectUser(req, res, next) {
 
 async function getPendingRequests(req, res, next) {
   try {
-    const result = await pool.query(
-      `SELECT u.id, u.name, u.email, u.role, u.created_at, u.approval_status,
-              c.name AS company_name
-       FROM users u
-       JOIN companies c ON c.id = u.company_id
-       WHERE u.approval_status = 'pending'
-       ORDER BY u.created_at DESC`
-    );
+    let result;
+    if (req.user.is_platform_admin) {
+      // Platform admin sees ALL pending users across all companies
+      result = await pool.query(
+        `SELECT u.id, u.name, u.email, u.role, u.created_at, u.approval_status,
+                c.name AS company_name
+         FROM users u
+         JOIN companies c ON c.id = u.company_id
+         WHERE u.approval_status = 'pending'
+         ORDER BY u.created_at DESC`
+      );
+    } else {
+      // Company super_admin sees only pending users in THEIR company
+      result = await pool.query(
+        `SELECT u.id, u.name, u.email, u.role, u.created_at, u.approval_status,
+                c.name AS company_name
+         FROM users u
+         JOIN companies c ON c.id = u.company_id
+         WHERE u.approval_status = 'pending' AND u.company_id = $1
+         ORDER BY u.created_at DESC`,
+        [req.user.company_id]
+      );
+    }
     return success(res, result.rows);
   } catch (err) {
     next(err);
