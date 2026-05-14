@@ -1,4 +1,3 @@
-const path   = require('path');
 const pool   = require('../config/database');
 const { success, error } = require('../utils/apiResponse');
 
@@ -48,12 +47,12 @@ async function updateCompany(req, res, next) {
 async function uploadLogo(req, res, next) {
   try {
     if (!req.file) return error(res, 'No file uploaded', 400);
-    const logoUrl = `/uploads/${req.file.filename}`;
+    const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     await pool.query(
       'UPDATE companies SET logo_url = $1, updated_at = NOW() WHERE id = $2',
-      [logoUrl, req.user.company_id]
+      [dataUrl, req.user.company_id]
     );
-    return success(res, { logo_url: logoUrl });
+    return success(res, { logo_url: dataUrl });
   } catch (err) {
     next(err);
   }
@@ -62,12 +61,12 @@ async function uploadLogo(req, res, next) {
 async function uploadWatermark(req, res, next) {
   try {
     if (!req.file) return error(res, 'No file uploaded', 400);
-    const watermarkUrl = `/uploads/${req.file.filename}`;
+    const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     await pool.query(
       'UPDATE companies SET watermark_url = $1, updated_at = NOW() WHERE id = $2',
-      [watermarkUrl, req.user.company_id]
+      [dataUrl, req.user.company_id]
     );
-    return success(res, { watermark_url: watermarkUrl });
+    return success(res, { watermark_url: dataUrl });
   } catch (err) {
     next(err);
   }
@@ -76,14 +75,14 @@ async function uploadWatermark(req, res, next) {
 async function uploadSignature(req, res, next) {
   try {
     if (!req.file) return error(res, 'No file uploaded', 400);
-    const slot = req.params.slot || 'left'; // left | center | right
-    const url  = `/uploads/${req.file.filename}`;
+    const slot   = req.params.slot || 'left';
+    const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     await pool.query(
       `INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)
        ON CONFLICT (company_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [req.user.company_id, `signature_${slot}`, url]
+      [req.user.company_id, `signature_${slot}`, dataUrl]
     );
-    return success(res, { slot, url });
+    return success(res, { slot, url: dataUrl });
   } catch (err) {
     next(err);
   }

@@ -89,6 +89,7 @@ export default function SettingsPage() {
     try {
       const res = await CompanyAPI.uploadLogo(form);
       setCompany(c => c ? { ...c, logo_url: res.data.data.logo_url } : c);
+      if (logoRef.current) logoRef.current.value = '';
       notify({ type: 'success', message: 'Logo uploaded' });
     } catch { notify({ type: 'error', message: 'Upload failed' }); }
   }
@@ -98,7 +99,9 @@ export default function SettingsPage() {
     if (!file) return;
     const form = new FormData(); form.append('watermark', file);
     try {
-      await CompanyAPI.uploadWatermark(form);
+      const res = await CompanyAPI.uploadWatermark(form);
+      setCompany(c => c ? { ...c, watermark_url: res.data.data.watermark_url } : c);
+      if (wmRef.current) wmRef.current.value = '';
       notify({ type: 'success', message: 'Watermark uploaded' });
     } catch { notify({ type: 'error', message: 'Upload failed' }); }
   }
