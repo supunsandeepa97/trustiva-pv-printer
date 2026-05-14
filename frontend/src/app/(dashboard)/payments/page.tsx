@@ -105,7 +105,10 @@ export default function PaymentPrintPage() {
           if (b.length === 1) setSelectedBank(b[0]);
         } catch { setBanks([]); }
       })
-      .catch(() => {});
+      .catch(err => {
+        console.warn('[PaymentPrintPage] Init load failed:', err?.message ?? err);
+        notify({ type: 'error', message: 'Failed to load initial data. Please refresh the page.' });
+      });
   }, []);
 
   /* ── Dropzone ────────────────────────────────────────────── */

@@ -47,11 +47,13 @@ export default function PrintPage() {
           PrintAPI.preview(id),
           TemplateAPI.list(),
         ]);
-        const { voucher: v, company: c } = pvRes.data.data;
+        const { voucher: v, company: c } = pvRes.data.data ?? {};
+        if (!v || !c) throw new Error('Incomplete response from server');
+        const templateList: VoucherTemplate[] = tmplRes.data.data ?? [];
         setVoucher(v);
         setCompany(c);
-        setTemplates(tmplRes.data.data);
-        const defaultTmpl = tmplRes.data.data.find((t: VoucherTemplate) => t.is_default);
+        setTemplates(templateList);
+        const defaultTmpl = templateList.find((t: VoucherTemplate) => t.is_default);
         if (defaultTmpl) setTemplate(defaultTmpl);
       } catch {
         notify({ type: 'error', message: 'Failed to load voucher' });

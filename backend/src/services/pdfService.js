@@ -2,6 +2,8 @@ const { PDFDocument, rgb, StandardFonts, degrees } = require('pdf-lib');
 const fs   = require('fs');
 const path = require('path');
 
+const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+
 const PDF_DIR = process.env.PDF_DIR || './generated-pdfs';
 if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
 
@@ -54,8 +56,12 @@ async function drawVoucherPage(page, voucher, company, template, pdfDoc) {
   // Logo (if available and field visible)
   let logoRight = MARGIN;
   if (isFieldVisible('logo', template) && company.logo_url) {
-    const logoPath = path.join(process.cwd(), company.logo_url.replace(/^\//, ''));
-    if (fs.existsSync(logoPath)) {
+    const safeUrl  = company.logo_url.replace(/^\//, '');
+    const logoPath = path.resolve(process.cwd(), safeUrl);
+    const withinUploads = logoPath.startsWith(UPLOADS_DIR + path.sep) || logoPath.startsWith(UPLOADS_DIR + '/');
+    if (!withinUploads) {
+      console.warn('[PDF] Logo path rejected — outside uploads directory:', safeUrl);
+    } else if (fs.existsSync(logoPath)) {
       try {
         const logoBytes = fs.readFileSync(logoPath);
         const logoImg   = company.logo_url.endsWith('.png')
@@ -64,7 +70,9 @@ async function drawVoucherPage(page, voucher, company, template, pdfDoc) {
         const logoScale = logoImg.scaleToFit(45, 45);
         page.drawImage(logoImg, { x: MARGIN, y: A5_H - headerH + (headerH - logoScale.height) / 2, ...logoScale });
         logoRight = MARGIN + logoScale.width + 8;
-      } catch {}
+      } catch (e) {
+        console.warn('[PDF] Logo embed failed:', e.message);
+      }
     }
   }
 
@@ -204,7 +212,7 @@ async function generateVoucherPDF(voucher, company, template) {
   const bytes    = await pdfDoc.save();
   const filename = `voucher-${voucher.id}-${Date.now()}.pdf`;
   const filePath = path.join(PDF_DIR, filename);
-  fs.writeFileSync(filePath, bytes);
+  await fs.promises.writeFile(filePath, bytes);
   return { filePath, filename, url: `/generated-pdfs/${filename}` };
 }
 
@@ -218,7 +226,7 @@ async function generateBulkPDF(vouchers, company, template) {
   const bytes    = await pdfDoc.save();
   const filename = `bulk-${Date.now()}.pdf`;
   const filePath = path.join(PDF_DIR, filename);
-  fs.writeFileSync(filePath, bytes);
+  await fs.promises.writeFile(filePath, bytes);
   return { filePath, filename, url: `/generated-pdfs/${filename}` };
 }
 

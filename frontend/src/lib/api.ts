@@ -11,7 +11,12 @@ api.interceptors.request.use(config => {
 });
 
 let isRefreshing = false;
-let refreshQueue: Array<(token: string) => void> = [];
+let refreshQueue: Array<(token: string | null, err?: unknown) => void> = [];
+
+function drainQueue(token: string | null, err?: unknown) {
+  refreshQueue.forEach(cb => cb(token, err));
+  refreshQueue = [];
+}
 
 // 401 → refresh → retry
 api.interceptors.response.use(
@@ -20,8 +25,9 @@ api.interceptors.response.use(
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        return new Promise(resolve => {
-          refreshQueue.push(token => {
+        return new Promise((resolve, reject) => {
+          refreshQueue.push((token, err) => {
+            if (err || !token) return reject(err ?? error);
             originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${token}` };
             resolve(api(originalRequest));
           });
@@ -31,6 +37,7 @@ api.interceptors.response.use(
       isRefreshing = true;
       const refreshToken = getRefreshToken();
       if (!refreshToken) {
+        drainQueue(null, error);
         clearTokens();
         window.location.href = '/login';
         return Promise.reject(error);
@@ -40,11 +47,11 @@ api.interceptors.response.use(
         const { token, user } = data.data;
         setTokens(token, refreshToken);
         setUser(user);
-        refreshQueue.forEach(cb => cb(token));
-        refreshQueue = [];
+        drainQueue(token);
         originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${token}` };
         return api(originalRequest);
-      } catch {
+      } catch (refreshError) {
+        drainQueue(null, refreshError);
         clearTokens();
         window.location.href = '/login';
         return Promise.reject(error);

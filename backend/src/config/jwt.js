@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 
+if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+  console.warn('[SECURITY] JWT_SECRET and JWT_REFRESH_SECRET are not set. Set these environment variables immediately — do not use in production without them.');
+}
+
 const ACCESS_SECRET  = process.env.JWT_SECRET          || 'dev_access_secret_change_me';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET   || 'dev_refresh_secret_change_me';
 const ACCESS_TTL     = process.env.JWT_EXPIRES_IN       || '8h';

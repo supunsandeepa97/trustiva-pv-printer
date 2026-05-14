@@ -116,8 +116,8 @@ async function forgotPassword(req, res, next) {
       [user.company_id, `otp_${user.id}`, JSON.stringify({ otp, expires })]
     );
 
-    // In production: send email with OTP. For now, log it.
-    console.log(`[OTP] ${email}: ${otp} (expires ${expires})`);
+    // In production: send email with OTP. For now, log without exposing the value.
+    console.log(`[OTP] Generated for ${email} (expires ${expires})`);
 
     return success(res, { message: 'If that email exists, an OTP has been sent.' });
   } catch (err) {
@@ -144,6 +144,11 @@ async function resetPassword(req, res, next) {
     const { otp: storedOtp, expires } = JSON.parse(settingResult.rows[0].value);
     if (new Date() > new Date(expires)) return error(res, 'OTP has expired', 400);
     if (otp !== storedOtp) return error(res, 'Invalid OTP', 400);
+
+    if (!password || password.length < 8)        return error(res, 'Password must be at least 8 characters', 400);
+    if (!/[A-Z]/.test(password))                 return error(res, 'Password must contain an uppercase letter', 400);
+    if (!/[0-9]/.test(password))                 return error(res, 'Password must contain a number', 400);
+    if (!/[^A-Za-z0-9]/.test(password))          return error(res, 'Password must contain a special character', 400);
 
     const hash = await bcrypt.hash(password, 12);
     await pool.query(
