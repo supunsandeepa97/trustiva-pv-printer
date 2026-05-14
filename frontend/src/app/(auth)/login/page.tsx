@@ -53,6 +53,8 @@ export default function LoginPage() {
 
       {errorMsg && (
         <motion.div
+          role="alert"
+          aria-live="polite"
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           className="mb-4 bg-red-500/20 border border-red-500/40 text-red-200 text-sm rounded-lg px-4 py-3"
@@ -63,13 +65,15 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
+          <label htmlFor="email" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
             Email Address
           </label>
           <input
+            id="email"
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
+            autoComplete="email"
             className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm transition outline-none"
             style={{
               background: 'rgba(255,255,255,0.07)',
@@ -83,14 +87,16 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
+          <label htmlFor="password" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
             Password
           </label>
           <div className="relative">
             <input
+              id="password"
               type={showPass ? 'text' : 'password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
+              autoComplete="current-password"
               className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm transition outline-none pr-11"
               style={{
                 background: 'rgba(255,255,255,0.07)',
@@ -104,7 +110,8 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setShowPass(p => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 transition"
+              aria-label={showPass ? 'Hide password' : 'Show password'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 transition p-1"
               style={{ color: 'rgba(201,162,39,0.5)' }}
               onMouseEnter={e => (e.currentTarget.style.color = '#C9A227')}
               onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,162,39,0.5)')}
@@ -115,8 +122,9 @@ export default function LoginPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label htmlFor="remember-me" className="flex items-center gap-2 cursor-pointer">
             <input
+              id="remember-me"
               type="checkbox"
               checked={remember}
               onChange={e => setRemember(e.target.checked)}

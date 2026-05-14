@@ -87,6 +87,8 @@ export default function SignupPage() {
 
             {error && (
               <motion.div
+                role="alert"
+                aria-live="polite"
                 initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
                 className="mb-4 bg-red-500/20 border border-red-500/40 text-red-200 text-sm rounded-lg px-4 py-3"
               >
@@ -96,9 +98,11 @@ export default function SignupPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Company Name</label>
+                <label htmlFor="company_name" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Company Name</label>
                 <input
+                  id="company_name"
                   type="text" value={form.company_name} onChange={set('company_name')} required
+                  autoComplete="organization"
                   placeholder="Your company or organisation name"
                   className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
                   style={inputStyle}
@@ -108,9 +112,11 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Full Name</label>
+                <label htmlFor="full_name" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Full Name</label>
                 <input
+                  id="full_name"
                   type="text" value={form.name} onChange={set('name')} required
+                  autoComplete="name"
                   placeholder="Your full name"
                   className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
                   style={inputStyle}
@@ -120,9 +126,11 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Email Address</label>
+                <label htmlFor="signup_email" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Email Address</label>
                 <input
+                  id="signup_email"
                   type="email" value={form.email} onChange={set('email')} required
+                  autoComplete="email"
                   placeholder="you@company.com"
                   className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
                   style={inputStyle}
@@ -132,10 +140,12 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Password</label>
+                <label htmlFor="signup_password" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Password</label>
                 <div className="relative">
                   <input
+                    id="signup_password"
                     type={showPass ? 'text' : 'password'} value={form.password} onChange={set('password')} required
+                    autoComplete="new-password"
                     placeholder="••••••••" minLength={6}
                     className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition pr-11"
                     style={inputStyle}
@@ -143,7 +153,8 @@ export default function SignupPage() {
                     onBlur={e  => { e.currentTarget.style.border = '1px solid rgba(201,162,39,0.2)'; e.currentTarget.style.boxShadow = 'none'; }}
                   />
                   <button type="button" onClick={() => setShowPass(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 transition"
+                    aria-label={showPass ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 transition p-1"
                     style={{ color: 'rgba(201,162,39,0.5)' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#C9A227')}
                     onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,162,39,0.5)')}>
@@ -153,8 +164,9 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Requested Role</label>
+                <label htmlFor="requested_role" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Requested Role</label>
                 <select
+                  id="requested_role"
                   value={form.role} onChange={set('role')}
                   className="w-full text-white rounded-xl px-4 py-3 text-sm outline-none transition appearance-none cursor-pointer"
                   style={{ ...inputStyle, color: form.role ? '#fff' : 'rgba(100,116,139,1)' }}
@@ -166,10 +178,11 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
+                <label htmlFor="admin_message" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
                   Message to Admin <span style={{ color: 'rgba(201,162,39,0.4)' }}>(optional)</span>
                 </label>
                 <textarea
+                  id="admin_message"
                   value={form.message} onChange={set('message')} rows={2}
                   placeholder="Why do you need access?"
                   className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition resize-none"

@@ -6,7 +6,7 @@ import { useReactToPrint } from 'react-to-print';
 import {
   Upload, Eye, Printer, FileSpreadsheet,
   RotateCcw, CheckSquare, Square, Loader2,
-  AlertCircle, ChevronRight, ChevronLeft, FileText, Banknote,
+  AlertCircle, ChevronRight, ChevronLeft, FileText, Banknote, Check,
 } from 'lucide-react';
 import { ImportAPI, PaymentAPI, CompanyAPI, TemplateAPI, SettingsAPI } from '@/lib/api';
 import { useUIStore } from '@/store/uiStore';
@@ -44,7 +44,7 @@ function StepBar({ current }: { current: Step }) {
                            { background: '#E2E8F0', color: '#94A3B8' }
                 }
               >
-                {done ? '✓' : s.id}
+                {done ? <Check className="w-4 h-4" /> : s.id}
               </div>
               <span
                 className="text-xs font-medium"
@@ -364,7 +364,7 @@ export default function PaymentPrintPage() {
                   <thead className="sticky top-0 bg-slate-50 z-10">
                     <tr>
                       <th className="px-4 py-3 text-left">
-                        <button onClick={toggleAll} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 transition">
+                        <button onClick={toggleAll} aria-label={allSelected ? 'Deselect all' : 'Select all'} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 transition">
                           {allSelected
                             ? <CheckSquare className="w-4 h-4" style={{ color: '#C9A227' }} />
                             : <Square className="w-4 h-4" />}

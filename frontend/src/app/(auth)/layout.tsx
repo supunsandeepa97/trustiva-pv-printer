@@ -43,7 +43,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               >
                 TRUST<span style={{ fontWeight: 900 }}>IVA</span>
               </div>
-              <div className="text-xs tracking-[0.3em] mt-0.5" style={{ color: 'rgba(201,162,39,0.55)' }}>
+              <div className="text-xs tracking-[0.3em] mt-0.5" style={{ color: 'rgba(201,162,39,0.75)' }}>
                 PRINT SUITE
               </div>
             </div>
@@ -55,7 +55,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <div className="w-8 h-px" style={{ background: 'rgba(201,162,39,0.4)' }} />
             </div>
 
-            <p className="text-sm" style={{ color: 'rgba(201,162,39,0.5)' }}>
+            <p className="text-sm" style={{ color: 'rgba(201,162,39,0.7)' }}>
               Smart Financial Printing Platform
             </p>
           </div>

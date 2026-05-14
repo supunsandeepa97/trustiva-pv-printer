@@ -1,7 +1,7 @@
 'use client';
 import { usePathname } from 'next/navigation';
 import { Menu, Bell, LogOut, Settings, ChevronDown, UserCheck } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +20,18 @@ export default function TopNav() {
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [pendingCount,  setPendingCount]  = useState(0);
   const isSuperAdmin = user?.role === 'super_admin';
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -39,7 +51,7 @@ export default function TopNav() {
   return (
     <header className="no-print bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
       <div className="flex items-center gap-4">
-        <button onClick={toggleSidebar} className="text-slate-500 hover:text-slate-800 transition">
+        <button onClick={toggleSidebar} aria-label="Toggle sidebar" className="text-slate-500 hover:text-slate-800 transition p-1.5 rounded-lg">
           <Menu className="w-5 h-5" />
         </button>
         <div>
@@ -62,7 +74,7 @@ export default function TopNav() {
         )}
 
         {/* Notifications bell */}
-        <button className="relative text-slate-500 hover:text-slate-800 transition p-1.5">
+        <button aria-label="Notifications" className="relative text-slate-500 hover:text-slate-800 transition p-1.5 rounded-lg">
           <Bell className="w-5 h-5" />
           {notifications.length > 0 && (
             <span
@@ -75,9 +87,12 @@ export default function TopNav() {
         </button>
 
         {/* User menu */}
-        <div className="relative">
+        <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
+            aria-label="User menu"
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
             className="flex items-center gap-2 text-sm text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl px-3 py-2 transition"
           >
             <div

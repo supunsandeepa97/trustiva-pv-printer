@@ -22,7 +22,12 @@ const iconColors = {
 export default function Notifications() {
   const { notifications, removeNotification } = useUIStore();
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs w-full no-print">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="false"
+      className="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs w-full no-print"
+    >
       <AnimatePresence>
         {notifications.map(n => {
           const Icon = icons[n.type];
@@ -34,9 +39,13 @@ export default function Notifications() {
               exit={{ opacity: 0, x: 60, scale: 0.95 }}
               className={`flex items-start gap-3 p-3.5 rounded-xl border shadow-lg ${colors[n.type]}`}
             >
-              <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${iconColors[n.type]}`} />
+              <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${iconColors[n.type]}`} aria-hidden="true" />
               <p className="flex-1 text-sm font-medium">{n.message}</p>
-              <button onClick={() => removeNotification(n.id)} className="text-current opacity-60 hover:opacity-100">
+              <button
+                onClick={() => removeNotification(n.id)}
+                aria-label="Dismiss notification"
+                className="text-current opacity-60 hover:opacity-100 p-0.5 rounded"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             </motion.div>

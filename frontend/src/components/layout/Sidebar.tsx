@@ -54,18 +54,19 @@ export default function Sidebar() {
       {/* Toggle button */}
       <button
         onClick={toggleSidebar}
-        className="absolute -right-3 top-[56px] w-6 h-6 rounded-full flex items-center justify-center z-10 shadow-lg border"
+        aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+        className="absolute -right-3.5 top-[52px] w-7 h-7 rounded-full flex items-center justify-center z-10 shadow-lg border"
         style={{ background: '#0F172A', borderColor: 'rgba(201,162,39,0.4)', color: '#C9A227' }}
       >
-        {sidebarOpen ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {sidebarOpen ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
       </button>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-5 space-y-1">
+      <nav className="flex-1 px-3 py-5 space-y-1" aria-label="Main navigation">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
-            <Link key={href} href={href} title={!sidebarOpen ? label : undefined}>
+            <Link key={href} href={href} title={!sidebarOpen ? label : undefined} aria-current={active ? 'page' : undefined}>
               <div className={cn('sidebar-item', active ? 'active' : 'inactive')}>
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 <AnimatePresence>
