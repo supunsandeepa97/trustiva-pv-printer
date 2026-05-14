@@ -21,6 +21,7 @@ interface BankAccount {
 export default function SettingsPage() {
   const notify = useUIStore(s => s.addNotification);
   const { isAllowed } = useAuth();
+  const canEditCompany = isAllowed(['super_admin', 'finance_manager']);
   const [activeTab, setActiveTab] = useState<Tab>('company');
   const [company,   setCompany]   = useState<Company | null>(null);
   const [settings,  setSettings]  = useState<Record<string, string>>({});
@@ -179,11 +180,15 @@ export default function SettingsPage() {
                 />
               </div>
             ))}
-            <button onClick={saveCompany} disabled={saving}
-              className="flex items-center gap-2 disabled:opacity-60 font-semibold px-5 py-2.5 rounded-xl transition text-sm"
-              style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Changes
-            </button>
+            {canEditCompany ? (
+              <button onClick={saveCompany} disabled={saving}
+                className="flex items-center gap-2 disabled:opacity-60 font-semibold px-5 py-2.5 rounded-xl transition text-sm"
+                style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Changes
+              </button>
+            ) : (
+              <p className="text-xs text-slate-400">You need Finance Manager or higher role to edit company details.</p>
+            )}
           </div>
         )}
 
@@ -207,10 +212,12 @@ export default function SettingsPage() {
                   <p className="font-semibold text-slate-800 mb-0.5">{label}</p>
                   <p className="text-slate-500 text-sm mb-3">{hint}</p>
                   <input ref={ref} type="file" accept="image/*" className="hidden" onChange={fn} />
-                  <button onClick={() => ref.current?.click()}
-                    className="flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm px-4 py-2 rounded-xl transition">
-                    <Upload className="w-4 h-4" /> Upload {label}
-                  </button>
+                  {canEditCompany && (
+                    <button onClick={() => ref.current?.click()}
+                      className="flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm px-4 py-2 rounded-xl transition">
+                      <Upload className="w-4 h-4" /> Upload {label}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -235,11 +242,15 @@ export default function SettingsPage() {
                 />
               </div>
             ))}
-            <button onClick={savePrintingSettings} disabled={saving}
-              className="flex items-center gap-2 disabled:opacity-60 font-semibold px-5 py-2.5 rounded-xl transition text-sm"
-              style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Settings
-            </button>
+            {canEditCompany ? (
+              <button onClick={savePrintingSettings} disabled={saving}
+                className="flex items-center gap-2 disabled:opacity-60 font-semibold px-5 py-2.5 rounded-xl transition text-sm"
+                style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Settings
+              </button>
+            ) : (
+              <p className="text-xs text-slate-400">You need Finance Manager or higher role to edit these settings.</p>
+            )}
           </div>
         )}
 
@@ -248,14 +259,16 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-slate-900">Bank Accounts</h3>
-              <button
-                onClick={() => setShowBankForm(v => !v)}
-                className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition"
-                style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}
-              >
-                {showBankForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                {showBankForm ? 'Cancel' : 'Add Bank'}
-              </button>
+              {canEditCompany && (
+                <button
+                  onClick={() => setShowBankForm(v => !v)}
+                  className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition"
+                  style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}
+                >
+                  {showBankForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  {showBankForm ? 'Cancel' : 'Add Bank'}
+                </button>
+              )}
             </div>
 
             {/* Add form */}
@@ -316,12 +329,15 @@ export default function SettingsPage() {
                         {[b.branch, b.account_no].filter(Boolean).join(' · ') || 'No details'}
                       </p>
                     </div>
-                    <button
-                      onClick={() => deleteBank(b.id)}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {canEditCompany && (
+                      <button
+                        onClick={() => deleteBank(b.id)}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                        aria-label={`Remove ${b.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

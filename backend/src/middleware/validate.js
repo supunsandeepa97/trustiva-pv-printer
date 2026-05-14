@@ -50,7 +50,7 @@ const schemas = {
     name:       z.string().optional(),
     address:    z.string().optional(),
     phone:      z.string().optional(),
-    email:      z.string().email().optional(),
+    email:      z.preprocess(v => v === '' ? undefined : v, z.string().email().optional()),
     tax_number: z.string().optional(),
   }),
 };
