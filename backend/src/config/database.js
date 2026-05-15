@@ -60,7 +60,7 @@ function startRecoveryWatch() {
   }, 30_000);
 }
 
-// Smart query wrapper used by every controller via `pool.query()`
+// Smart query/connect wrapper used by every controller
 const pool = {
   query: async (text, values) => {
     if (!usingBackup) {
@@ -76,9 +76,27 @@ const pool = {
         throw err;
       }
     }
-    // Currently running on backup
     if (!backupPool) throw new Error('Primary DB is down and no backup DB is configured');
     return backupPool.query(text, values);
+  },
+
+  // Used by controllers that need transactions (e.g. signupRequest)
+  connect: async () => {
+    if (!usingBackup) {
+      try {
+        return await primaryPool.connect();
+      } catch (err) {
+        if (isConnectionError(err) && backupPool) {
+          console.error('[DB] Primary unreachable on connect — failing over to backup DB:', err.message);
+          usingBackup = true;
+          startRecoveryWatch();
+          return await backupPool.connect();
+        }
+        throw err;
+      }
+    }
+    if (!backupPool) throw new Error('Primary DB is down and no backup DB is configured');
+    return backupPool.connect();
   },
 
   // Expose raw pools for the backup service
