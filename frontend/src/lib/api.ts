@@ -139,8 +139,9 @@ export const DashboardAPI = {
 
 // ─── Platform API (platform admin only) ───────────────────────
 export const PlatformAPI = {
-  listCompanies:  ()          => api.get('/platform/companies'),
-  toggleCompany:  (id: string) => api.patch(`/platform/companies/${id}/toggle`),
+  listCompanies:   ()           => api.get('/platform/companies'),
+  toggleCompany:   (id: string) => api.patch(`/platform/companies/${id}/toggle`),
+  getCompanyUsers: (id: string) => api.get(`/platform/companies/${id}/users`),
 };
 
 // ─── Settings API ─────────────────────────────────────────────

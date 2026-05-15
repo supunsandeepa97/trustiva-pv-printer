@@ -44,4 +44,17 @@ async function toggleCompany(req, res, next) {
   }
 }
 
-module.exports = { listCompanies, toggleCompany };
+async function getCompanyUsers(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role, is_active, approval_status, created_at
+       FROM users WHERE company_id = $1 ORDER BY created_at`,
+      [req.params.id]
+    );
+    return success(res, result.rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listCompanies, toggleCompany, getCompanyUsers };
