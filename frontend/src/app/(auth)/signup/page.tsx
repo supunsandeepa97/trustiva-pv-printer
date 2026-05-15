@@ -5,14 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Loader2, Send, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { AuthAPI } from '@/lib/api';
 
-const ROLES = [
-  { value: 'finance_manager', label: 'Finance Manager' },
-  { value: 'finance_user',    label: 'Finance User' },
-  { value: 'viewer',          label: 'Viewer (Read-only)' },
-];
-
 export default function SignupPage() {
-  const [form, setForm] = useState({ company_name: '', name: '', email: '', password: '', role: 'finance_user', message: '' });
+  const [form, setForm] = useState({ company_name: '', name: '', email: '', password: '', message: '' });
   const [showPass, setShowPass]   = useState(false);
   const [loading,  setLoading]    = useState(false);
   const [error,    setError]      = useState('');
@@ -78,10 +72,10 @@ export default function SignupPage() {
           <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="mb-6">
               <h1 className="text-white text-2xl font-bold mb-1" style={{ fontFamily: 'Montserrat, Inter, sans-serif' }}>
-                Request Access
+                Register Your Company
               </h1>
               <p className="text-sm" style={{ color: 'rgba(201,162,39,0.5)' }}>
-                Submit your details — the admin will approve your account.
+                You'll be the admin of your company. We'll review and activate your account.
               </p>
             </div>
 
@@ -161,20 +155,6 @@ export default function SignupPage() {
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <label htmlFor="requested_role" className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Requested Role</label>
-                <select
-                  id="requested_role"
-                  value={form.role} onChange={set('role')}
-                  className="w-full text-white rounded-xl px-4 py-3 text-sm outline-none transition appearance-none cursor-pointer"
-                  style={{ ...inputStyle, color: form.role ? '#fff' : 'rgba(100,116,139,1)' }}
-                  onFocus={e => { e.currentTarget.style.border = '1px solid rgba(201,162,39,0.7)'; }}
-                  onBlur={e  => { e.currentTarget.style.border = '1px solid rgba(201,162,39,0.2)'; }}
-                >
-                  {ROLES.map(r => <option key={r.value} value={r.value} style={{ background: '#1e293b' }}>{r.label}</option>)}
-                </select>
               </div>
 
               <div>
