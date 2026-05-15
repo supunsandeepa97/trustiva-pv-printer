@@ -286,4 +286,51 @@ async function getPendingRequests(req, res, next) {
   }
 }
 
-module.exports = { login, register, refreshToken, forgotPassword, resetPassword, getMe, signupRequest, approveUser, rejectUser, getPendingRequests };
+async function listCompanies(req, res, next) {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT c.id, c.name
+      FROM companies c
+      JOIN users u ON u.company_id = c.id
+      WHERE c.is_active = TRUE
+        AND u.role = 'super_admin'
+        AND u.approval_status = 'approved'
+      ORDER BY c.name
+    `);
+    return success(res, result.rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function joinRequest(req, res, next) {
+  try {
+    const { company_id, name, email, password, role = 'finance_user', message = '' } = req.body;
+    const ALLOWED_ROLES = ['finance_manager', 'finance_user', 'viewer'];
+
+    if (!company_id || !name || !email || !password)
+      return error(res, 'Company, name, email and password are required', 400);
+    if (!ALLOWED_ROLES.includes(role))
+      return error(res, 'Invalid role', 400);
+
+    const companyCheck = await pool.query(
+      'SELECT id, name FROM companies WHERE id = $1 AND is_active = TRUE',
+      [company_id]
+    );
+    if (!companyCheck.rows[0]) return error(res, 'Company not found', 404);
+
+    const hash = await bcrypt.hash(password, 12);
+    await pool.query(
+      `INSERT INTO users (company_id, name, email, password_hash, role, is_active, approval_status)
+       VALUES ($1, $2, $3, $4, $5, FALSE, 'pending')`,
+      [company_id, name.trim(), email.toLowerCase().trim(), hash, role]
+    );
+
+    return success(res, { message: 'Request submitted. The company admin will review your request.' }, 201);
+  } catch (err) {
+    if (err.code === '23505') return error(res, 'That email address is already registered.', 409);
+    next(err);
+  }
+}
+
+module.exports = { login, register, refreshToken, forgotPassword, resetPassword, getMe, signupRequest, approveUser, rejectUser, getPendingRequests, listCompanies, joinRequest };

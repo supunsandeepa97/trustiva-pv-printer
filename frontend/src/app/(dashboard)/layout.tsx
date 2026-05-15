@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import Sidebar from '@/components/layout/Sidebar';
 import TopNav from '@/components/layout/TopNav';
 import Notifications from '@/components/layout/Notifications';
+import CompanyWatermark from '@/components/layout/CompanyWatermark';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -26,6 +27,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       <Notifications />
+      <CompanyWatermark />
     </div>
   );
 }

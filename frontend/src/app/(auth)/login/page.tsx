@@ -159,9 +159,9 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-5 text-center text-sm" style={{ color: 'rgba(201,162,39,0.5)' }}>
-        Don&apos;t have access?{' '}
+        Don&apos;t have an account?{' '}
         <Link href="/signup" className="font-semibold transition" style={{ color: '#C9A227' }}>
-          Request Access
+          Sign Up
         </Link>
       </p>
 

@@ -72,6 +72,8 @@ export const AuthAPI = {
   resetPassword:   (data: object)                    => api.post('/auth/reset-password', data),
   me:              ()                                => api.get('/auth/me'),
   signupRequest:       (data: object) => axios.post('/api/v1/auth/signup-request', data),
+  joinRequest:         (data: object) => axios.post('/api/v1/auth/join-request', data),
+  listCompanies:       ()             => axios.get('/api/v1/auth/companies'),
   approveUser:         (id: string)   => api.patch(`/auth/approve/${id}`),
   rejectUser:          (id: string)   => api.patch(`/auth/reject/${id}`),
   getPendingRequests:  ()             => api.get('/auth/pending-requests'),
@@ -85,6 +87,7 @@ export const CompanyAPI = {
   uploadWatermark: (form: FormData)     => api.post('/company/watermark', form),
   uploadSignature: (slot: string, form: FormData) => api.post(`/company/signature/${slot}`, form),
   getUsers:        ()                   => api.get('/company/users'),
+  createUser:      (data: object)       => api.post('/company/users', data),
   updateUser:      (id: string, data: object) => api.put(`/company/users/${id}`, data),
 };
 

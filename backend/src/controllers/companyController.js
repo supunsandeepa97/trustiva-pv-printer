@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const pool   = require('../config/database');
 const { success, error } = require('../utils/apiResponse');
 
@@ -120,4 +121,32 @@ async function updateUser(req, res, next) {
   }
 }
 
-module.exports = { getCompany, updateCompany, uploadLogo, uploadWatermark, uploadSignature, getUsers, updateUser };
+async function createUser(req, res, next) {
+  try {
+    const { name, email, password, role } = req.body;
+    const ALLOWED_ROLES = ['finance_manager', 'finance_user', 'viewer'];
+
+    if (!name?.trim() || !email?.trim() || !password || !role) {
+      return error(res, 'Name, email, password and role are required', 400);
+    }
+    if (!ALLOWED_ROLES.includes(role)) {
+      return error(res, 'Invalid role', 400);
+    }
+
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+    if (existing.rows.length > 0) return error(res, 'Email already registered', 409);
+
+    const hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (company_id, name, email, password_hash, role, is_active, approval_status)
+       VALUES ($1, $2, $3, $4, $5, TRUE, 'approved')
+       RETURNING id, name, email, role, is_active, approval_status, created_at`,
+      [req.user.company_id, name.trim(), email.toLowerCase().trim(), hash, role]
+    );
+    return success(res, result.rows[0], 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getCompany, updateCompany, uploadLogo, uploadWatermark, uploadSignature, getUsers, updateUser, createUser };

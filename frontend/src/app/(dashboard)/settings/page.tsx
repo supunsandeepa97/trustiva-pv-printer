@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Upload, Loader2, Users, Building, Palette, Printer, Landmark, Plus, Trash2, X, UserCheck, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Save, Upload, Loader2, Users, Building, Palette, Printer, Landmark, Plus, Trash2, X, UserCheck, CheckCircle2, XCircle, Clock, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { CompanyAPI, SettingsAPI, AuthAPI } from '@/lib/api';
 
 interface PendingUser { id: string; name: string; email: string; role: string; company_name: string; created_at: string; approval_status: string; }
@@ -31,8 +31,14 @@ export default function SettingsPage() {
   const [users,        setUsers]        = useState<Array<{ id: string; name: string; email: string; role: string; is_active: boolean; approval_status: string; created_at: string }>>([]);
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [saving,    setSaving]    = useState(false);
-  const [loading,   setLoading]   = useState(true);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'finance_user' });
+  const [createSaving, setCreateSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [saving,        setSaving]        = useState(false);
+  const [loading,       setLoading]       = useState(true);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [wmUploading,   setWmUploading]   = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
   const wmRef   = useRef<HTMLInputElement>(null);
 
@@ -85,25 +91,56 @@ export default function SettingsPage() {
   async function uploadLogo() {
     const file = logoRef.current?.files?.[0];
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      notify({ type: 'error', message: 'Logo must be under 2 MB. Resize the image and try again.' });
+      if (logoRef.current) logoRef.current.value = '';
+      return;
+    }
+    setLogoUploading(true);
     const form = new FormData(); form.append('logo', file);
     try {
       const res = await CompanyAPI.uploadLogo(form);
       setCompany(c => c ? { ...c, logo_url: res.data.data.logo_url } : c);
       if (logoRef.current) logoRef.current.value = '';
       notify({ type: 'success', message: 'Logo uploaded' });
-    } catch { notify({ type: 'error', message: 'Upload failed' }); }
+    } catch { notify({ type: 'error', message: 'Upload failed. Check file type and try again.' }); }
+    finally { setLogoUploading(false); }
   }
 
   async function uploadWatermark() {
     const file = wmRef.current?.files?.[0];
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      notify({ type: 'error', message: 'Watermark must be under 2 MB. Resize the image and try again.' });
+      if (wmRef.current) wmRef.current.value = '';
+      return;
+    }
+    setWmUploading(true);
     const form = new FormData(); form.append('watermark', file);
     try {
       const res = await CompanyAPI.uploadWatermark(form);
       setCompany(c => c ? { ...c, watermark_url: res.data.data.watermark_url } : c);
       if (wmRef.current) wmRef.current.value = '';
       notify({ type: 'success', message: 'Watermark uploaded' });
-    } catch { notify({ type: 'error', message: 'Upload failed' }); }
+    } catch { notify({ type: 'error', message: 'Upload failed. Check file type and try again.' }); }
+    finally { setWmUploading(false); }
+  }
+
+  async function handleCreateUser() {
+    if (!createForm.name.trim() || !createForm.email.trim() || !createForm.password) return;
+    setCreateSaving(true);
+    try {
+      const res = await CompanyAPI.createUser(createForm);
+      setUsers(us => [...us, res.data.data]);
+      setCreateForm({ name: '', email: '', password: '', role: 'finance_user' });
+      setShowCreateUser(false);
+      notify({ type: 'success', message: `${res.data.data.name} added to your team` });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      notify({ type: 'error', message: msg || 'Failed to create user' });
+    } finally {
+      setCreateSaving(false);
+    }
   }
 
   async function saveBanks(updated: BankAccount[]) {
@@ -203,13 +240,13 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <h3 className="font-semibold text-slate-900">Branding Assets</h3>
             {[
-              { label: 'Company Logo', hint: 'PNG recommended · Appears on voucher header', ref: logoRef, fn: uploadLogo, preview: company?.logo_url, key: 'logo' },
-              { label: 'Watermark',    hint: 'PNG with transparency · Optional background watermark', ref: wmRef, fn: uploadWatermark, preview: company?.watermark_url, key: 'watermark' },
-            ].map(({ label, hint, ref, fn, preview }) => (
+              { label: 'Company Logo', hint: 'PNG recommended · Max 2 MB · Appears on voucher header and all pages', ref: logoRef, fn: uploadLogo, preview: company?.logo_url, uploading: logoUploading },
+              { label: 'Watermark',    hint: 'PNG with transparency · Max 2 MB · Optional background watermark on vouchers', ref: wmRef, fn: uploadWatermark, preview: company?.watermark_url, uploading: wmUploading },
+            ].map(({ label, hint, ref, fn, preview, uploading }) => (
               <div key={label} className="flex items-start gap-6">
-                <div className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center bg-slate-50 flex-shrink-0">
+                <div className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center bg-slate-50 flex-shrink-0 overflow-hidden">
                   {preview ? (
-                    <img src={preview} alt={label} className="w-full h-full object-contain rounded-xl p-1" />
+                    <img src={preview} alt={label} className="w-full h-full object-contain p-1" />
                   ) : (
                     <Upload className="w-8 h-8 text-slate-300" />
                   )}
@@ -217,11 +254,15 @@ export default function SettingsPage() {
                 <div>
                   <p className="font-semibold text-slate-800 mb-0.5">{label}</p>
                   <p className="text-slate-500 text-sm mb-3">{hint}</p>
-                  <input ref={ref} type="file" accept="image/*" className="hidden" onChange={fn} />
+                  <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={fn} />
                   {canEditCompany && (
-                    <button onClick={() => ref.current?.click()}
-                      className="flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm px-4 py-2 rounded-xl transition">
-                      <Upload className="w-4 h-4" /> Upload {label}
+                    <button
+                      onClick={() => !uploading && ref.current?.click()}
+                      disabled={uploading}
+                      className="flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm px-4 py-2 rounded-xl transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                      {uploading ? 'Uploading…' : `Upload ${label}`}
                     </button>
                   )}
                 </div>
@@ -430,48 +471,131 @@ export default function SettingsPage() {
         {/* Users */}
         {activeTab === 'users' && (
           <div>
-            <h3 className="font-semibold text-slate-900 mb-4">User Management</h3>
             {!isAllowed(['super_admin']) ? (
               <p className="text-slate-500 text-sm">Only Super Admins can manage users.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      {['Name','Email','Role','Status','Actions'].map(h => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {users.map(u => (
-                      <tr key={u.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
-                        <td className="px-4 py-3 text-slate-600">{u.email}</td>
-                        <td className="px-4 py-3 capitalize text-slate-700">{u.role.replace('_',' ')}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {u.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={async () => {
-                              try {
-                                await CompanyAPI.updateUser(u.id, { is_active: !u.is_active });
-                                setUsers(us => us.map(x => x.id === u.id ? { ...x, is_active: !x.is_active } : x));
-                                notify({ type: 'success', message: `User ${u.is_active ? 'deactivated' : 'activated'}` });
-                              } catch { notify({ type: 'error', message: 'Action failed' }); }
-                            }}
-                            className="text-xs text-slate-500 hover:text-slate-800 border border-slate-200 px-2 py-1 rounded-lg transition"
-                          >
-                            {u.is_active ? 'Deactivate' : 'Activate'}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-900">Team Members</h3>
+                  <button
+                    onClick={() => { setShowCreateUser(v => !v); setCreateForm({ name: '', email: '', password: '', role: 'finance_user' }); }}
+                    className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition"
+                    style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}
+                  >
+                    {showCreateUser ? <X className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                    {showCreateUser ? 'Cancel' : 'Add User'}
+                  </button>
+                </div>
+
+                {/* Create user form */}
+                {showCreateUser && (
+                  <div className="border border-gold-300 rounded-xl p-4 space-y-3 bg-amber-50/40">
+                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">New Team Member</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Full Name *</label>
+                        <input
+                          type="text" placeholder="e.g. Kasun Perera"
+                          value={createForm.name}
+                          onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Email *</label>
+                        <input
+                          type="email" placeholder="kasun@company.com"
+                          value={createForm.email}
+                          onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Password *</label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'} placeholder="Temporary password"
+                            value={createForm.password}
+                            onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500"
+                          />
+                          <button type="button" onClick={() => setShowPassword(v => !v)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Role *</label>
+                        <select
+                          value={createForm.role}
+                          onChange={e => setCreateForm(f => ({ ...f, role: e.target.value }))}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 bg-white"
+                        >
+                          <option value="finance_manager">Finance Manager</option>
+                          <option value="finance_user">Finance User</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCreateUser}
+                      disabled={createSaving || !createForm.name.trim() || !createForm.email.trim() || !createForm.password}
+                      className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-50 transition"
+                      style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }}
+                    >
+                      {createSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                      Create User
+                    </button>
+                  </div>
+                )}
+
+                {/* Users table */}
+                {users.length === 0 ? (
+                  <div className="text-center py-10 text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl">
+                    No team members yet. Click "Add User" to invite someone.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          {['Name','Email','Role','Status','Actions'].map(h => (
+                            <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {users.map(u => (
+                          <tr key={u.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
+                            <td className="px-4 py-3 text-slate-600">{u.email}</td>
+                            <td className="px-4 py-3 capitalize text-slate-700">{u.role.replace(/_/g,' ')}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                {u.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await CompanyAPI.updateUser(u.id, { is_active: !u.is_active });
+                                    setUsers(us => us.map(x => x.id === u.id ? { ...x, is_active: !x.is_active } : x));
+                                    notify({ type: 'success', message: `User ${u.is_active ? 'deactivated' : 'activated'}` });
+                                  } catch { notify({ type: 'error', message: 'Action failed' }); }
+                                }}
+                                className="text-xs text-slate-500 hover:text-slate-800 border border-slate-200 px-2 py-1 rounded-lg transition"
+                              >
+                                {u.is_active ? 'Deactivate' : 'Activate'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>

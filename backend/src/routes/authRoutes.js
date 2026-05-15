@@ -11,6 +11,8 @@ router.post('/forgot-password', auth.forgotPassword);
 router.post('/reset-password',  auth.resetPassword);
 router.get('/me',               verifyToken, auth.getMe);
 router.post('/signup-request',   auth.signupRequest);
+router.get('/companies',         auth.listCompanies);
+router.post('/join-request',     auth.joinRequest);
 router.get('/pending-requests',  verifyToken, requireRole(['super_admin']), auth.getPendingRequests);
 router.patch('/approve/:id',     verifyToken, requireRole(['super_admin']), auth.approveUser);
 router.patch('/reject/:id',      verifyToken, requireRole(['super_admin']), auth.rejectUser);

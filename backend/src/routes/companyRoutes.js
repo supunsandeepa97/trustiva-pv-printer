@@ -13,6 +13,7 @@ router.post('/logo',             verifyToken, requireRole(managers), imageMemory
 router.post('/watermark',        verifyToken, requireRole(managers), imageMemoryUpload.single('watermark'), company.uploadWatermark);
 router.post('/signature/:slot',  verifyToken, requireRole(managers), imageMemoryUpload.single('signature'), company.uploadSignature);
 router.get('/users',             verifyToken, requireRole(['super_admin']), company.getUsers);
+router.post('/users',            verifyToken, requireRole(['super_admin']), company.createUser);
 router.put('/users/:id',         verifyToken, requireRole(['super_admin']), company.updateUser);
 
 module.exports = router;

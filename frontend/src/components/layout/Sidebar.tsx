@@ -9,7 +9,7 @@ import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard',       icon: LayoutDashboard, platformOnly: false },
+  { href: '/dashboard', label: 'Dashboard',       icon: LayoutDashboard, platformOnly: false, hidden: true },
   { href: '/payments',  label: 'Payment Print',   icon: Printer,         platformOnly: false },
   { href: '/history',   label: 'Payment History', icon: History,         platformOnly: false },
   { href: '/settings',  label: 'Settings',        icon: Settings,        platformOnly: false },
@@ -66,7 +66,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-1" aria-label="Main navigation">
-        {NAV_ITEMS.filter(item => user?.is_platform_admin ? item.platformOnly : !item.platformOnly).map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.filter(item => !item.hidden && (user?.is_platform_admin ? item.platformOnly : !item.platformOnly)).map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link key={href} href={href} title={!sidebarOpen ? label : undefined} aria-current={active ? 'page' : undefined}>
