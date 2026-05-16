@@ -4,9 +4,6 @@ const path = require('path');
 
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 
-const PDF_DIR = process.env.PDF_DIR || './generated-pdfs';
-if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
-
 // A5 in points: 148mm × 210mm
 const A5_W = 419.53;
 const A5_H = 595.28;
@@ -214,12 +211,9 @@ async function generateVoucherPDF(voucher, company, template) {
   const pdfDoc = await PDFDocument.create();
   const page   = pdfDoc.addPage([A5_W, A5_H]);
   await drawVoucherPage(page, voucher, company, template, pdfDoc);
-
   const bytes    = await pdfDoc.save();
   const filename = `voucher-${voucher.id}-${Date.now()}.pdf`;
-  const filePath = path.join(PDF_DIR, filename);
-  await fs.promises.writeFile(filePath, bytes);
-  return { filePath, filename, url: `/generated-pdfs/${filename}` };
+  return { bytes, filename };
 }
 
 async function generateBulkPDF(vouchers, company, template) {
@@ -228,12 +222,9 @@ async function generateBulkPDF(vouchers, company, template) {
     const page = pdfDoc.addPage([A5_W, A5_H]);
     await drawVoucherPage(page, voucher, company, template, pdfDoc);
   }
-
   const bytes    = await pdfDoc.save();
   const filename = `bulk-${Date.now()}.pdf`;
-  const filePath = path.join(PDF_DIR, filename);
-  await fs.promises.writeFile(filePath, bytes);
-  return { filePath, filename, url: `/generated-pdfs/${filename}` };
+  return { bytes, filename };
 }
 
 module.exports = { generateVoucherPDF, generateBulkPDF };

@@ -1,5 +1,3 @@
-const path   = require('path');
-const fs     = require('fs');
 const pool   = require('../config/database');
 const { generateVoucherPDF, generateBulkPDF } = require('../services/pdfService');
 const { success, error } = require('../utils/apiResponse');
@@ -39,22 +37,21 @@ async function generatePDF(req, res, next) {
     const company = cResult.rows[0];
 
     const template = { config: voucher.template_config, paper_size: voucher.paper_size };
-    const { filePath, filename, url } = await generateVoucherPDF(voucher, company, template);
+    const { bytes, filename } = await generateVoucherPDF(voucher, company, template);
 
     // Log the print
     await pool.query(
-      'INSERT INTO print_logs (voucher_id, printed_by, pdf_path, copies) VALUES ($1, $2, $3, $4)',
-      [voucher.id, req.user.id, url, parseInt(req.query.copies || 1)]
+      'INSERT INTO print_logs (voucher_id, printed_by, copies) VALUES ($1, $2, $3)',
+      [voucher.id, req.user.id, parseInt(req.query.copies || 1)]
     );
     await pool.query(
       `UPDATE payment_vouchers SET status = 'printed', updated_at = NOW() WHERE id = $1`,
       [voucher.id]
     );
 
-    // Stream file to client
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    fs.createReadStream(filePath).pipe(res);
+    res.send(Buffer.from(bytes));
   } catch (err) { next(err); }
 }
 
@@ -77,7 +74,7 @@ async function generateBulkPDFCtrl(req, res, next) {
     const company = cResult.rows[0];
     const defaultTemplate = { config: vResult.rows[0].template_config };
 
-    const { filePath, filename } = await generateBulkPDF(vResult.rows, company, defaultTemplate);
+    const { bytes, filename } = await generateBulkPDF(vResult.rows, company, defaultTemplate);
 
     // Log prints
     for (const v of vResult.rows) {
@@ -94,7 +91,7 @@ async function generateBulkPDFCtrl(req, res, next) {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    fs.createReadStream(filePath).pipe(res);
+    res.send(Buffer.from(bytes));
   } catch (err) { next(err); }
 }
 

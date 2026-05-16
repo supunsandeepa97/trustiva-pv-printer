@@ -16,8 +16,12 @@ const PORT = process.env.PORT || 4000;
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images from /uploads
 }));
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(s => s.trim());
 app.use(cors({
-  origin:      process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.some(o => o === '*' || o === origin)) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 
@@ -25,9 +29,11 @@ app.use(cors({
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ─── Static files ───────────────────────────────────────────
-app.use('/uploads',        express.static(path.resolve(process.env.UPLOAD_DIR || './uploads')));
-app.use('/generated-pdfs', express.static(path.resolve(process.env.PDF_DIR   || './generated-pdfs')));
+// ─── Static files (local only — not needed on serverless) ───
+if (!process.env.VERCEL) {
+  app.use('/uploads',        express.static(path.resolve(process.env.UPLOAD_DIR || './uploads')));
+  app.use('/generated-pdfs', express.static(path.resolve(process.env.PDF_DIR   || './generated-pdfs')));
+}
 
 // ─── Rate limiting on auth ──────────────────────────────────
 const authLimiter = rateLimit({
@@ -84,7 +90,7 @@ app.use(errorHandler);
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`TRUSTIVA PRINTER backend running on http://localhost:${PORT}`);
-    startBackupService();
+    if (!process.env.VERCEL) startBackupService();
   });
 }
 
