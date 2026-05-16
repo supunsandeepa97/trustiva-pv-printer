@@ -8,7 +8,7 @@ async function login(req, res, next) {
   try {
     const { email, password } = req.body;
     const result = await pool.query(
-      `SELECT u.*, c.name AS company_name, c.is_active AS company_is_active
+      `SELECT u.*, c.name AS company_name, c.is_active AS company_is_active, c.deleted_at AS company_deleted_at
        FROM users u
        JOIN companies c ON c.id = u.company_id
        WHERE u.email = $1`,
@@ -24,6 +24,7 @@ async function login(req, res, next) {
     if (user.approval_status === 'rejected') return error(res, 'Your access request was declined. Contact the administrator.', 403);
     if (!user.is_active) return error(res, 'Your account has been deactivated. Contact the administrator.', 403);
     if (!user.company_is_active) return error(res, 'Your company account is inactive. Please contact support.', 403);
+    if (user.company_deleted_at) return error(res, 'This company account has been deleted. Contact the platform administrator.', 403);
 
     const payload = {
       id:                user.id,

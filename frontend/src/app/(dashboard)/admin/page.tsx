@@ -6,6 +6,7 @@ import {
   ToggleLeft, ToggleRight, Loader2, TrendingUp,
   CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
   UserCheck, KeyRound, Pencil, Copy, Check, Power,
+  Trash2, RotateCcw, AlertTriangle, Mail, Inbox,
 } from 'lucide-react';
 import { PlatformAPI, AuthAPI } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,7 +15,7 @@ import { useUIStore } from '@/store/uiStore';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import type { PlatformCompany } from '@/types';
 
-type Tab = 'pending' | 'companies';
+type Tab = 'pending' | 'companies' | 'bin';
 
 interface PendingUser {
   id: string; name: string; email: string; role: string;
@@ -26,8 +27,14 @@ interface CompanyUser {
   is_active: boolean; approval_status: string; created_at: string;
 }
 
-interface EditModalState { open: boolean; user: CompanyUser | null; companyId: string; }
-interface ResetModalState { open: boolean; name: string; tempPassword: string; }
+interface EditModalState   { open: boolean; user: CompanyUser | null; companyId: string; }
+interface ResetModalState  { open: boolean; name: string; tempPassword: string; }
+interface DeleteModalState { open: boolean; company: PlatformCompany | null; step: 'confirm' | 'otp'; otp: string; sending: boolean; deleting: boolean; }
+interface BinCompany {
+  id: string; name: string; email: string; created_at: string;
+  deleted_at: string; purge_at: string; days_remaining: number;
+  user_count: number; voucher_count: number;
+}
 
 export default function PlatformAdminPage() {
   const { user }  = useAuth();
@@ -52,6 +59,12 @@ export default function PlatformAdminPage() {
   const [editSaving,   setEditSaving]   = useState(false);
   const [resetModal,   setResetModal]   = useState<ResetModalState>({ open: false, name: '', tempPassword: '' });
   const [copied,       setCopied]       = useState(false);
+
+  // Delete + Bin state
+  const [deleteModal,  setDeleteModal]  = useState<DeleteModalState>({ open: false, company: null, step: 'confirm', otp: '', sending: false, deleting: false });
+  const [bin,          setBin]          = useState<BinCompany[]>([]);
+  const [binLoaded,    setBinLoaded]    = useState(false);
+  const [restoring,    setRestoring]    = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.is_platform_admin) { router.replace('/payments'); return; }
@@ -111,6 +124,60 @@ export default function PlatformAdminPage() {
       setCompanyUsers(prev => ({ ...prev, [id]: r.data.data }));
     } catch { notify({ type: 'error', message: 'Failed to load users' }); }
     finally { setLoadingUsers(null); }
+  }
+
+  async function loadBin() {
+    if (binLoaded) return;
+    try {
+      const r = await PlatformAPI.listBin();
+      setBin(r.data.data);
+      setBinLoaded(true);
+    } catch { notify({ type: 'error', message: 'Failed to load bin' }); }
+  }
+
+  function openDelete(c: PlatformCompany) {
+    setDeleteModal({ open: true, company: c, step: 'confirm', otp: '', sending: false, deleting: false });
+  }
+
+  async function sendOtp() {
+    if (!deleteModal.company) return;
+    setDeleteModal(d => ({ ...d, sending: true }));
+    try {
+      await PlatformAPI.requestDeleteOtp(deleteModal.company.id);
+      setDeleteModal(d => ({ ...d, step: 'otp', sending: false }));
+      notify({ type: 'success', message: 'OTP sent to supunsandeepa@yahoo.com' });
+    } catch {
+      setDeleteModal(d => ({ ...d, sending: false }));
+      notify({ type: 'error', message: 'Failed to send OTP' });
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteModal.company || !deleteModal.otp) return;
+    setDeleteModal(d => ({ ...d, deleting: true }));
+    try {
+      await PlatformAPI.deleteCompany(deleteModal.company.id, deleteModal.otp);
+      setCompanies(cs => cs.filter(c => c.id !== deleteModal.company!.id));
+      setBinLoaded(false); // force refresh bin next time
+      setDeleteModal({ open: false, company: null, step: 'confirm', otp: '', sending: false, deleting: false });
+      notify({ type: 'success', message: `${deleteModal.company.name} moved to bin` });
+    } catch (e: any) {
+      setDeleteModal(d => ({ ...d, deleting: false }));
+      notify({ type: 'error', message: e?.response?.data?.message || 'Delete failed — check OTP' });
+    }
+  }
+
+  async function doRestore(b: BinCompany) {
+    setRestoring(b.id);
+    try {
+      await PlatformAPI.restoreCompany(b.id);
+      setBin(prev => prev.filter(x => x.id !== b.id));
+      // Reload companies
+      const r = await PlatformAPI.listCompanies();
+      setCompanies(r.data.data);
+      notify({ type: 'success', message: `${b.name} restored successfully` });
+    } catch { notify({ type: 'error', message: 'Restore failed' }); }
+    finally { setRestoring(null); }
   }
 
   function openEdit(u: CompanyUser, companyId: string) {
@@ -217,8 +284,9 @@ export default function PlatformAdminPage() {
         {([
           { id: 'pending',   label: 'Pending Approvals', icon: UserCheck,  badge: pending.length },
           { id: 'companies', label: 'All Companies',      icon: Building2,  badge: 0 },
+          { id: 'bin',       label: 'Bin',                icon: Inbox,      badge: 0 },
         ] as const).map(({ id, label, icon: Icon, badge }) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button key={id} onClick={() => { setTab(id); if (id === 'bin') loadBin(); }}
             className="relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition"
             style={tab === id
               ? { background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A', boxShadow: '0 2px 10px rgba(201,162,39,0.35)' }
@@ -365,6 +433,15 @@ export default function PlatformAdminPage() {
                       {c.is_active ? 'Deactivate' : 'Activate'}
                     </button>
 
+                    {/* Delete button */}
+                    <button
+                      onClick={e => { e.stopPropagation(); openDelete(c); }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition flex-shrink-0"
+                      title="Delete company"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
                     {/* Expand chevron */}
                     {expandedId === c.id
                       ? <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -467,6 +544,75 @@ export default function PlatformAdminPage() {
             </div>
           </motion.div>
         )}
+        {/* ── Bin ── */}
+        {tab === 'bin' && (
+          <motion.div key="bin" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="bg-white rounded-2xl shadow-card overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-900">Deleted Companies</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Data is kept for 1 year — restore anytime before the purge date</p>
+              </div>
+              <span className="text-xs text-slate-400">{bin.length} in bin</span>
+            </div>
+
+            {!binLoaded ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+              </div>
+            ) : bin.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                <Inbox className="w-12 h-12 mb-3 opacity-30" />
+                <p className="font-medium text-slate-500">Bin is empty</p>
+                <p className="text-sm mt-1">Deleted companies appear here</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {bin.map((b, i) => (
+                  <motion.div key={b.id}
+                    initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
+                    className="flex items-center gap-4 px-6 py-4 hover:bg-red-50/20 transition">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 bg-red-100 text-red-400">
+                      {b.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800">{b.name}</p>
+                      <p className="text-xs text-slate-400">{b.email || 'No email'}</p>
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        <span className="text-xs text-slate-400">
+                          Deleted {formatDate(b.deleted_at)}
+                        </span>
+                        <span className="text-xs text-slate-300">·</span>
+                        <span className="flex items-center gap-1 text-xs">
+                          <Users className="w-3 h-3 text-slate-400" />{b.user_count} users
+                        </span>
+                        <span className="text-xs text-slate-300">·</span>
+                        <span className="flex items-center gap-1 text-xs">
+                          <FileText className="w-3 h-3 text-slate-400" />{b.voucher_count} vouchers
+                        </span>
+                      </div>
+                    </div>
+                    {/* Purge countdown */}
+                    <div className="hidden sm:flex flex-col items-end flex-shrink-0 mr-2">
+                      <span className={`text-sm font-bold ${b.days_remaining < 30 ? 'text-red-500' : b.days_remaining < 90 ? 'text-amber-500' : 'text-slate-500'}`}>
+                        {b.days_remaining}d left
+                      </span>
+                      <span className="text-xs text-slate-400">Purge {formatDate(b.purge_at)}</span>
+                    </div>
+                    <button
+                      onClick={() => doRestore(b)}
+                      disabled={restoring === b.id}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl transition disabled:opacity-50 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex-shrink-0"
+                    >
+                      {restoring === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                      Restore
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* ── Edit User Modal ── */}
@@ -527,6 +673,98 @@ export default function PlatformAdminPage() {
                   {editSaving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Delete Company Modal ── */}
+      <AnimatePresence>
+        {deleteModal.open && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)' }}
+            onClick={() => !deleteModal.sending && !deleteModal.deleting && setDeleteModal(d => ({ ...d, open: false }))}>
+            <motion.div initial={{ scale: 0.95, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 16 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+
+              {deleteModal.step === 'confirm' ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-100">
+                      <Trash2 className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-900">Delete Company</h2>
+                      <p className="text-xs text-slate-400">This action requires email verification</p>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="font-semibold text-red-800 text-sm">{deleteModal.company?.name}</p>
+                    <p className="text-xs text-red-600 mt-1">{deleteModal.company?.user_count} users · {deleteModal.company?.voucher_count} vouchers</p>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-700">The company and all its users will be deactivated. All data is preserved in the Bin for 1 year and can be fully restored.</p>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => setDeleteModal(d => ({ ...d, open: false }))}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                    >Cancel</button>
+                    <button
+                      onClick={sendOtp}
+                      disabled={deleteModal.sending}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition disabled:opacity-60"
+                      style={{ background: 'linear-gradient(135deg,#DC2626,#B91C1C)' }}
+                    >
+                      {deleteModal.sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                      {deleteModal.sending ? 'Sending…' : 'Send OTP to Email'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-100">
+                      <KeyRound className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-900">Enter Verification Code</h2>
+                      <p className="text-xs text-slate-400">Sent to supunsandeepa@yahoo.com</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500">Enter the 6-digit OTP from your email to confirm deletion of <strong className="text-slate-800">{deleteModal.company?.name}</strong>.</p>
+                  <input
+                    value={deleteModal.otp}
+                    onChange={e => setDeleteModal(d => ({ ...d, otp: e.target.value.replace(/\D/g,'').slice(0,6) }))}
+                    placeholder="000000"
+                    maxLength={6}
+                    className="w-full text-center text-3xl font-mono font-bold tracking-widest border-2 border-slate-200 rounded-xl py-4 focus:outline-none focus:border-red-400 text-slate-900"
+                    disabled={deleteModal.deleting}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setDeleteModal(d => ({ ...d, step: 'confirm', otp: '' }))}
+                      disabled={deleteModal.deleting}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                    >Back</button>
+                    <button
+                      onClick={confirmDelete}
+                      disabled={deleteModal.otp.length !== 6 || deleteModal.deleting}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition disabled:opacity-50"
+                      style={{ background: 'linear-gradient(135deg,#DC2626,#B91C1C)' }}
+                    >
+                      {deleteModal.deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      {deleteModal.deleting ? 'Deleting…' : 'Delete Company'}
+                    </button>
+                  </div>
+                  <button onClick={sendOtp} disabled={deleteModal.sending} className="w-full text-xs text-slate-400 hover:text-slate-600 transition disabled:opacity-50 pt-1">
+                    {deleteModal.sending ? 'Resending…' : 'Resend OTP'}
+                  </button>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

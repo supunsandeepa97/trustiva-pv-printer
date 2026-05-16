@@ -1,6 +1,8 @@
 const pool    = require('../config/database');
 const bcrypt  = require('bcryptjs');
 const { success, error } = require('../utils/apiResponse');
+const otpSvc  = require('../services/otpService');
+const { sendDeleteOtpEmail } = require('../services/mailerService');
 
 function genTempPassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -26,6 +28,7 @@ async function listCompanies(req, res, next) {
       FROM companies c
       LEFT JOIN users u  ON u.company_id  = c.id
       LEFT JOIN payment_vouchers pv ON pv.company_id = c.id
+      WHERE c.deleted_at IS NULL
       GROUP BY c.id
       ORDER BY c.created_at DESC
     `);
@@ -126,4 +129,101 @@ async function resetUserPassword(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listCompanies, toggleCompany, getCompanyUsers, toggleUser, updateUser, resetUserPassword };
+async function requestDeleteOtp(req, res, next) {
+  try {
+    const { id } = req.params;
+    const r = await pool.query(
+      `SELECT name FROM companies WHERE id = $1 AND deleted_at IS NULL`, [id]
+    );
+    if (!r.rows[0]) return error(res, 'Company not found', 404);
+    const otp = otpSvc.set(id);
+    await sendDeleteOtpEmail(otp, r.rows[0].name);
+    return success(res, { message: 'OTP sent to admin email' });
+  } catch (err) { next(err); }
+}
+
+async function deleteCompany(req, res, next) {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { otp } = req.body;
+    if (!otp) return error(res, 'OTP is required', 400);
+    if (!otpSvc.verify(otp, id)) return error(res, 'Invalid or expired OTP', 400);
+
+    // Protect platform owner's company
+    const ownerCheck = await client.query(
+      `SELECT u.id FROM users u WHERE u.company_id = $1 AND u.is_platform_admin = TRUE LIMIT 1`, [id]
+    );
+    if (ownerCheck.rows.length > 0) return error(res, 'Cannot delete the platform owner company', 403);
+
+    await client.query('BEGIN');
+    const r = await client.query(
+      `UPDATE companies SET deleted_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL RETURNING id, name`,
+      [id]
+    );
+    if (!r.rows[0]) { await client.query('ROLLBACK'); return error(res, 'Company not found', 404); }
+
+    await client.query(
+      `UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE company_id = $1`, [id]
+    );
+
+    await client.query('COMMIT');
+    return success(res, { message: `${r.rows[0].name} moved to bin` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally { client.release(); }
+}
+
+async function listBin(req, res, next) {
+  try {
+    const r = await pool.query(`
+      SELECT
+        c.id, c.name, c.email, c.created_at, c.deleted_at,
+        (c.deleted_at + INTERVAL '1 year') AS purge_at,
+        EXTRACT(DAY FROM (c.deleted_at + INTERVAL '1 year') - NOW())::INT AS days_remaining,
+        COUNT(DISTINCT u.id)::INT  AS user_count,
+        COUNT(DISTINCT pv.id)::INT AS voucher_count
+      FROM companies c
+      LEFT JOIN users u  ON u.company_id = c.id
+      LEFT JOIN payment_vouchers pv ON pv.company_id = c.id
+      WHERE c.deleted_at IS NOT NULL AND c.deleted_at > NOW() - INTERVAL '1 year'
+      GROUP BY c.id
+      ORDER BY c.deleted_at DESC
+    `);
+    return success(res, r.rows);
+  } catch (err) { next(err); }
+}
+
+async function restoreCompany(req, res, next) {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    await client.query('BEGIN');
+    const r = await client.query(
+      `UPDATE companies SET deleted_at = NULL, updated_at = NOW()
+       WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id, name`,
+      [id]
+    );
+    if (!r.rows[0]) { await client.query('ROLLBACK'); return error(res, 'Company not in bin', 404); }
+
+    await client.query(
+      `UPDATE users SET is_active = TRUE, updated_at = NOW()
+       WHERE company_id = $1 AND approval_status = 'approved'`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+    return success(res, { message: `${r.rows[0].name} restored successfully`, id });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally { client.release(); }
+}
+
+module.exports = {
+  listCompanies, toggleCompany, getCompanyUsers,
+  toggleUser, updateUser, resetUserPassword,
+  requestDeleteOtp, deleteCompany, listBin, restoreCompany,
+};
