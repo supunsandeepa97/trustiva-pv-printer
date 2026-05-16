@@ -1,58 +1,31 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Loader2, Send, CheckCircle2, ArrowLeft, Building2, Users } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Send, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { AuthAPI } from '@/lib/api';
 
-type Mode = 'new' | 'join';
-
-interface Company { id: string; name: string; }
-
 export default function SignupPage() {
-  const [mode, setMode] = useState<Mode>('new');
-
-  // New company form
-  const [newForm, setNewForm] = useState({ company_name: '', name: '', email: '', password: '', message: '' });
-
-  // Join company form
-  const [joinForm, setJoinForm] = useState({ company_id: '', name: '', email: '', password: '', role: 'finance_user', message: '' });
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [companiesLoading, setCompaniesLoading] = useState(false);
-
+  const [form, setForm] = useState({ company_name: '', name: '', email: '', password: '', message: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
   const [success,  setSuccess]  = useState(false);
 
-  useEffect(() => {
-    if (mode === 'join' && companies.length === 0) {
-      setCompaniesLoading(true);
-      AuthAPI.listCompanies()
-        .then(res => setCompanies(res.data.data))
-        .catch(() => setError('Failed to load companies.'))
-        .finally(() => setCompaniesLoading(false));
-    }
-  }, [mode]);
-
-  function setNew(field: string) {
+  function setField(field: string) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setNewForm(f => ({ ...f, [field]: e.target.value }));
-  }
-  function setJoin(field: string) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-      setJoinForm(f => ({ ...f, [field]: e.target.value }));
+      setForm(f => ({ ...f, [field]: e.target.value }));
   }
 
   const inputStyle = {
     background: 'rgba(255,255,255,0.07)',
     border: '1px solid rgba(201,162,39,0.2)',
   };
-  const focus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const focus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     e.currentTarget.style.border = '1px solid rgba(201,162,39,0.7)';
     e.currentTarget.style.boxShadow = '0 0 0 3px rgba(201,162,39,0.12)';
   };
-  const blur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const blur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     e.currentTarget.style.border = '1px solid rgba(201,162,39,0.2)';
     e.currentTarget.style.boxShadow = 'none';
   };
@@ -60,35 +33,17 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-
-    if (mode === 'new') {
-      if (!newForm.company_name.trim()) { setError('Company name is required.'); return; }
-      if (newForm.password.length < 6)  { setError('Password must be at least 6 characters.'); return; }
-      setLoading(true);
-      try {
-        await AuthAPI.signupRequest(newForm);
-        setSuccess(true);
-      } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Request failed. Please try again.';
-        setError(msg);
-      } finally { setLoading(false); }
-    } else {
-      if (!joinForm.company_id) { setError('Please select a company.'); return; }
-      if (joinForm.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
-      setLoading(true);
-      try {
-        await AuthAPI.joinRequest(joinForm);
-        setSuccess(true);
-      } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Request failed. Please try again.';
-        setError(msg);
-      } finally { setLoading(false); }
-    }
+    if (!form.company_name.trim()) { setError('Company name is required.'); return; }
+    if (form.password.length < 6)  { setError('Password must be at least 6 characters.'); return; }
+    setLoading(true);
+    try {
+      await AuthAPI.signupRequest(form);
+      setSuccess(true);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Request failed. Please try again.';
+      setError(msg);
+    } finally { setLoading(false); }
   }
-
-  const successMsg = mode === 'new'
-    ? 'Your company registration request has been submitted. The platform admin will review and activate your account.'
-    : 'Your access request has been submitted. The company admin will review and approve your account.';
 
   return (
     <motion.div
@@ -111,7 +66,7 @@ export default function SignupPage() {
               Request Submitted!
             </h2>
             <p className="text-sm mb-6" style={{ color: 'rgba(201,162,39,0.6)' }}>
-              {successMsg}
+              Your company registration request has been submitted. The platform admin will review and activate your account.
             </p>
             <Link href="/login"
               className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition"
@@ -121,33 +76,13 @@ export default function SignupPage() {
           </motion.div>
         ) : (
           <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="mb-5">
+            <div className="mb-6">
               <h1 className="text-white text-2xl font-bold mb-1" style={{ fontFamily: 'Montserrat, Inter, sans-serif' }}>
-                Sign Up
+                Register Company
               </h1>
               <p className="text-sm" style={{ color: 'rgba(201,162,39,0.5)' }}>
-                Register a new company or request access to an existing one.
+                Create a new company account on Trustiva.
               </p>
-            </div>
-
-            {/* Mode toggle */}
-            <div className="flex rounded-xl overflow-hidden mb-5" style={{ border: '1px solid rgba(201,162,39,0.2)' }}>
-              {([
-                { id: 'new',  label: 'New Company',  Icon: Building2 },
-                { id: 'join', label: 'Join Company',  Icon: Users     },
-              ] as { id: Mode; label: string; Icon: typeof Building2 }[]).map(({ id, label, Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => { setMode(id); setError(''); }}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold transition"
-                  style={mode === id
-                    ? { background: 'linear-gradient(135deg,#C9A227,#DDB820)', color: '#0F172A' }
-                    : { background: 'transparent', color: 'rgba(201,162,39,0.6)' }}
-                >
-                  <Icon className="w-4 h-4" /> {label}
-                </button>
-              ))}
             </div>
 
             {error && (
@@ -161,131 +96,52 @@ export default function SignupPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <AnimatePresence mode="wait">
-                {mode === 'new' ? (
-                  <motion.div key="new" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Company Name</label>
-                      <input type="text" value={newForm.company_name} onChange={setNew('company_name')} required
-                        placeholder="Your company or organisation name" autoComplete="organization"
-                        className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
-                        style={inputStyle} onFocus={focus} onBlur={blur} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Your Full Name</label>
-                      <input type="text" value={newForm.name} onChange={setNew('name')} required
-                        placeholder="Your full name" autoComplete="name"
-                        className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
-                        style={inputStyle} onFocus={focus} onBlur={blur} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Email Address</label>
-                      <input type="email" value={newForm.email} onChange={setNew('email')} required
-                        placeholder="you@company.com" autoComplete="email"
-                        className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
-                        style={inputStyle} onFocus={focus} onBlur={blur} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Password</label>
-                      <div className="relative">
-                        <input type={showPass ? 'text' : 'password'} value={newForm.password} onChange={setNew('password')} required
-                          placeholder="••••••••" minLength={6} autoComplete="new-password"
-                          className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition pr-11"
-                          style={inputStyle} onFocus={focus} onBlur={blur} />
-                        <button type="button" onClick={() => setShowPass(p => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 transition p-1"
-                          style={{ color: 'rgba(201,162,39,0.5)' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#C9A227')}
-                          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,162,39,0.5)')}>
-                          {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
-                        Message <span style={{ color: 'rgba(201,162,39,0.4)' }}>(optional)</span>
-                      </label>
-                      <textarea value={newForm.message} onChange={setNew('message')} rows={2}
-                        placeholder="Tell us about your company or use case"
-                        className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition resize-none"
-                        style={inputStyle} onFocus={focus} onBlur={blur} />
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div key="join" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Select Company</label>
-                      {companiesLoading ? (
-                        <div className="flex items-center gap-2 py-3 text-sm" style={{ color: 'rgba(201,162,39,0.5)' }}>
-                          <Loader2 className="w-4 h-4 animate-spin" /> Loading companies…
-                        </div>
-                      ) : (
-                        <select value={joinForm.company_id} onChange={setJoin('company_id')} required
-                          className="w-full text-white rounded-xl px-4 py-3 text-sm outline-none transition"
-                          style={{ ...inputStyle, color: joinForm.company_id ? 'white' : 'rgb(100,116,139)' }}
-                          onFocus={focus} onBlur={blur}>
-                          <option value="" style={{ background: '#0F172A' }}>— Select your company —</option>
-                          {companies.map(c => (
-                            <option key={c.id} value={c.id} style={{ background: '#0F172A' }}>{c.name}</option>
-                          ))}
-                        </select>
-                      )}
-                      {!companiesLoading && companies.length === 0 && (
-                        <p className="text-xs mt-1" style={{ color: 'rgba(201,162,39,0.5)' }}>No active companies found.</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Your Full Name</label>
-                      <input type="text" value={joinForm.name} onChange={setJoin('name')} required
-                        placeholder="Your full name" autoComplete="name"
-                        className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
-                        style={inputStyle} onFocus={focus} onBlur={blur} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Email Address</label>
-                      <input type="email" value={joinForm.email} onChange={setJoin('email')} required
-                        placeholder="you@company.com" autoComplete="email"
-                        className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
-                        style={inputStyle} onFocus={focus} onBlur={blur} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Password</label>
-                      <div className="relative">
-                        <input type={showPass ? 'text' : 'password'} value={joinForm.password} onChange={setJoin('password')} required
-                          placeholder="••••••••" minLength={6} autoComplete="new-password"
-                          className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition pr-11"
-                          style={inputStyle} onFocus={focus} onBlur={blur} />
-                        <button type="button" onClick={() => setShowPass(p => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 transition p-1"
-                          style={{ color: 'rgba(201,162,39,0.5)' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#C9A227')}
-                          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,162,39,0.5)')}>
-                          {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Requested Role</label>
-                      <select value={joinForm.role} onChange={setJoin('role')}
-                        className="w-full text-white rounded-xl px-4 py-3 text-sm outline-none transition"
-                        style={inputStyle} onFocus={focus} onBlur={blur}>
-                        <option value="finance_manager" style={{ background: '#0F172A' }}>Finance Manager</option>
-                        <option value="finance_user"    style={{ background: '#0F172A' }}>Finance User</option>
-                        <option value="viewer"          style={{ background: '#0F172A' }}>Viewer</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
-                        Message <span style={{ color: 'rgba(201,162,39,0.4)' }}>(optional)</span>
-                      </label>
-                      <textarea value={joinForm.message} onChange={setJoin('message')} rows={2}
-                        placeholder="Why do you need access?"
-                        className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition resize-none"
-                        style={inputStyle} onFocus={focus} onBlur={blur} />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Company Name</label>
+                <input type="text" value={form.company_name} onChange={setField('company_name')} required
+                  placeholder="Your company or organisation name" autoComplete="organization"
+                  className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
+                  style={inputStyle} onFocus={focus} onBlur={blur} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Your Full Name</label>
+                <input type="text" value={form.name} onChange={setField('name')} required
+                  placeholder="Your full name" autoComplete="name"
+                  className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
+                  style={inputStyle} onFocus={focus} onBlur={blur} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Email Address</label>
+                <input type="email" value={form.email} onChange={setField('email')} required
+                  placeholder="you@company.com" autoComplete="email"
+                  className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition"
+                  style={inputStyle} onFocus={focus} onBlur={blur} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>Password</label>
+                <div className="relative">
+                  <input type={showPass ? 'text' : 'password'} value={form.password} onChange={setField('password')} required
+                    placeholder="••••••••" minLength={6} autoComplete="new-password"
+                    className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition pr-11"
+                    style={inputStyle} onFocus={focus} onBlur={blur} />
+                  <button type="button" onClick={() => setShowPass(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 transition p-1"
+                    style={{ color: 'rgba(201,162,39,0.5)' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#C9A227')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,162,39,0.5)')}>
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(201,162,39,0.8)' }}>
+                  Message <span style={{ color: 'rgba(201,162,39,0.4)' }}>(optional)</span>
+                </label>
+                <textarea value={form.message} onChange={setField('message')} rows={2}
+                  placeholder="Tell us about your company or use case"
+                  className="w-full text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm outline-none transition resize-none"
+                  style={inputStyle} onFocus={focus} onBlur={blur} />
+              </div>
 
               <button
                 type="submit" disabled={loading}
@@ -297,7 +153,7 @@ export default function SignupPage() {
                   fontFamily: 'Montserrat, Inter, sans-serif',
                 }}>
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {loading ? 'Submitting…' : mode === 'new' ? 'Register Company' : 'Request Access'}
+                {loading ? 'Submitting…' : 'Register Company'}
               </button>
             </form>
 
