@@ -142,9 +142,12 @@ export const DashboardAPI = {
 
 // ─── Platform API (platform admin only) ───────────────────────
 export const PlatformAPI = {
-  listCompanies:   ()           => api.get('/platform/companies'),
-  toggleCompany:   (id: string) => api.patch(`/platform/companies/${id}/toggle`),
-  getCompanyUsers: (id: string) => api.get(`/platform/companies/${id}/users`),
+  listCompanies:      ()                              => api.get('/platform/companies'),
+  toggleCompany:      (id: string)                    => api.patch(`/platform/companies/${id}/toggle`),
+  getCompanyUsers:    (id: string)                    => api.get(`/platform/companies/${id}/users`),
+  toggleUser:         (id: string)                    => api.patch(`/platform/users/${id}/toggle`),
+  updateUser:         (id: string, data: object)      => api.patch(`/platform/users/${id}`, data),
+  resetUserPassword:  (id: string)                    => api.post(`/platform/users/${id}/reset-password`),
 };
 
 // ─── Settings API ─────────────────────────────────────────────

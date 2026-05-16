@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, Building2, Users, FileText,
   ToggleLeft, ToggleRight, Loader2, TrendingUp,
   CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
-  UserCheck, AlertCircle,
+  UserCheck, KeyRound, Pencil, Copy, Check, Power,
 } from 'lucide-react';
 import { PlatformAPI, AuthAPI } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,6 +26,9 @@ interface CompanyUser {
   is_active: boolean; approval_status: string; created_at: string;
 }
 
+interface EditModalState { open: boolean; user: CompanyUser | null; companyId: string; }
+interface ResetModalState { open: boolean; name: string; tempPassword: string; }
+
 export default function PlatformAdminPage() {
   const { user }  = useAuth();
   const router    = useRouter();
@@ -40,6 +43,15 @@ export default function PlatformAdminPage() {
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
   const [companyUsers, setCompanyUsers] = useState<Record<string, CompanyUser[]>>({});
   const [loadingUsers, setLoadingUsers] = useState<string | null>(null);
+
+  // User management state
+  const [userActing,   setUserActing]   = useState<string | null>(null);
+  const [editModal,    setEditModal]    = useState<EditModalState>({ open: false, user: null, companyId: '' });
+  const [editName,     setEditName]     = useState('');
+  const [editEmail,    setEditEmail]    = useState('');
+  const [editSaving,   setEditSaving]   = useState(false);
+  const [resetModal,   setResetModal]   = useState<ResetModalState>({ open: false, name: '', tempPassword: '' });
+  const [copied,       setCopied]       = useState(false);
 
   useEffect(() => {
     if (!user?.is_platform_admin) { router.replace('/payments'); return; }
@@ -99,6 +111,59 @@ export default function PlatformAdminPage() {
       setCompanyUsers(prev => ({ ...prev, [id]: r.data.data }));
     } catch { notify({ type: 'error', message: 'Failed to load users' }); }
     finally { setLoadingUsers(null); }
+  }
+
+  function openEdit(u: CompanyUser, companyId: string) {
+    setEditName(u.name); setEditEmail(u.email);
+    setEditModal({ open: true, user: u, companyId });
+  }
+
+  async function saveEdit() {
+    if (!editModal.user) return;
+    setEditSaving(true);
+    try {
+      const r = await PlatformAPI.updateUser(editModal.user.id, { name: editName, email: editEmail });
+      const updated = r.data.data as CompanyUser;
+      setCompanyUsers(prev => ({
+        ...prev,
+        [editModal.companyId]: prev[editModal.companyId]?.map(u => u.id === updated.id ? { ...u, ...updated } : u) || [],
+      }));
+      setEditModal({ open: false, user: null, companyId: '' });
+      notify({ type: 'success', message: 'User updated successfully' });
+    } catch (e: any) {
+      notify({ type: 'error', message: e?.response?.data?.message || 'Update failed' });
+    } finally { setEditSaving(false); }
+  }
+
+  async function doResetPassword(u: CompanyUser) {
+    setUserActing(u.id);
+    try {
+      const r = await PlatformAPI.resetUserPassword(u.id);
+      const { temp_password } = r.data.data;
+      setResetModal({ open: true, name: u.name, tempPassword: temp_password });
+      notify({ type: 'success', message: `Password reset for ${u.name}` });
+    } catch { notify({ type: 'error', message: 'Password reset failed' }); }
+    finally { setUserActing(null); }
+  }
+
+  async function doToggleUser(u: CompanyUser, companyId: string) {
+    setUserActing(u.id);
+    try {
+      const r = await PlatformAPI.toggleUser(u.id);
+      const updated = r.data.data as CompanyUser;
+      setCompanyUsers(prev => ({
+        ...prev,
+        [companyId]: prev[companyId]?.map(x => x.id === updated.id ? { ...x, is_active: updated.is_active } : x) || [],
+      }));
+      notify({ type: 'success', message: `${u.name} ${updated.is_active ? 'activated' : 'deactivated'}` });
+    } catch { notify({ type: 'error', message: 'Action failed' }); }
+    finally { setUserActing(null); }
+  }
+
+  function copyPassword() {
+    navigator.clipboard.writeText(resetModal.tempPassword).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   const activeCount   = companies.filter(c => c.is_active).length;
@@ -345,10 +410,43 @@ export default function PlatformAdminPage() {
                                     {u.approval_status}
                                   </span>
                                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                    u.is_active ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-400'
+                                    u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'
                                   }`}>
                                     {u.is_active ? 'Active' : 'Inactive'}
                                   </span>
+                                  {/* Action buttons */}
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button
+                                      title="Edit user"
+                                      onClick={() => openEdit(u, c.id)}
+                                      disabled={userActing === u.id}
+                                      className="p-1.5 rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition disabled:opacity-40"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      title="Reset password"
+                                      onClick={() => doResetPassword(u)}
+                                      disabled={userActing === u.id}
+                                      className="p-1.5 rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition disabled:opacity-40"
+                                    >
+                                      {userActing === u.id
+                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        : <KeyRound className="w-3.5 h-3.5" />}
+                                    </button>
+                                    <button
+                                      title={u.is_active ? 'Deactivate user' : 'Activate user'}
+                                      onClick={() => doToggleUser(u, c.id)}
+                                      disabled={userActing === u.id}
+                                      className={`p-1.5 rounded-lg transition disabled:opacity-40 ${
+                                        u.is_active
+                                          ? 'text-slate-500 hover:bg-red-50 hover:text-red-500'
+                                          : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'
+                                      }`}
+                                    >
+                                      <Power className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -367,6 +465,108 @@ export default function PlatformAdminPage() {
                 </div>
               )}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Edit User Modal ── */}
+      <AnimatePresence>
+        {editModal.open && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={() => !editSaving && setEditModal({ open: false, user: null, companyId: '' })}>
+            <motion.div initial={{ scale: 0.95, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 16 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#3B82F6,#2563EB)' }}>
+                  <Pencil className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-900">Edit User</h2>
+                  <p className="text-xs text-slate-400">{editModal.user?.email}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="Full name"
+                    disabled={editSaving}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Email Address</label>
+                  <input
+                    value={editEmail}
+                    onChange={e => setEditEmail(e.target.value)}
+                    type="email"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="Email address"
+                    disabled={editSaving}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setEditModal({ open: false, user: null, companyId: '' })}
+                  disabled={editSaving}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                >Cancel</button>
+                <button
+                  onClick={saveEdit}
+                  disabled={editSaving || (!editName && !editEmail)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg,#3B82F6,#2563EB)' }}
+                >
+                  {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {editSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Reset Password Modal ── */}
+      <AnimatePresence>
+        {resetModal.open && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setResetModal({ open: false, name: '', tempPassword: '' })}>
+            <motion.div initial={{ scale: 0.95, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 16 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#C9A227,#DDB820)' }}>
+                  <KeyRound className="w-4 h-4 text-slate-900" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-900">Temporary Password</h2>
+                  <p className="text-xs text-slate-400">For {resetModal.name}</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-500">Password has been reset. Share this temporary password with the user — they should change it after logging in.</p>
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                <span className="flex-1 font-mono text-lg font-bold text-slate-900 tracking-widest select-all">{resetModal.tempPassword}</span>
+                <button onClick={copyPassword}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                  style={copied ? { background: '#ECFDF5', color: '#059669' } : { background: '#F1F5F9', color: '#475569' }}>
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <button
+                onClick={() => setResetModal({ open: false, name: '', tempPassword: '' })}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition"
+                style={{ background: 'linear-gradient(135deg,#0F172A,#1E3A5F)' }}
+              >Done</button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
