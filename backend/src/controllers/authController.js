@@ -2,7 +2,7 @@ const bcrypt   = require('bcryptjs');
 const pool     = require('../config/database');
 const { sign, signRefresh, verifyRefresh } = require('../config/jwt');
 const { success, error } = require('../utils/apiResponse');
-const { sendSignupRequestEmail } = require('../services/mailerService');
+const { sendSignupRequestEmail, sendPasswordResetEmail } = require('../services/mailerService');
 
 async function login(req, res, next) {
   try {
@@ -120,8 +120,7 @@ async function forgotPassword(req, res, next) {
       [user.company_id, `otp_${user.id}`, JSON.stringify({ otp, expires })]
     );
 
-    // In production: send email with OTP. For now, log without exposing the value.
-    console.log(`[OTP] Generated for ${email} (expires ${expires})`);
+    await sendPasswordResetEmail(otp, email.toLowerCase().trim());
 
     return success(res, { message: 'If that email exists, an OTP has been sent.' });
   } catch (err) {

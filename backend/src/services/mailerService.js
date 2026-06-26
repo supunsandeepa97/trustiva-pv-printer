@@ -102,4 +102,44 @@ async function sendDeleteOtpEmail(otp, companyName) {
   }
 }
 
-module.exports = { sendSignupRequestEmail, sendDeleteOtpEmail };
+async function sendPasswordResetEmail(otp, toEmail) {
+  const transporter = createTransport();
+
+  if (!transporter) {
+    console.log(`[OTP] Password reset OTP for ${toEmail}: ${otp} (expires in 10 min)`);
+    return;
+  }
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+      <div style="background:#0F172A;padding:20px 24px">
+        <h2 style="color:#C9A227;margin:0;font-size:18px">TRUSTIVA PRINT SUITE</h2>
+        <p style="color:#94a3b8;margin:4px 0 0;font-size:13px">Password Reset</p>
+      </div>
+      <div style="padding:24px">
+        <p style="color:#374151;margin:0 0 16px">We received a request to reset your Trustiva password. Use the code below to continue:</p>
+        <div style="text-align:center;padding:20px;background:#f8fafc;border:2px dashed #C9A227;border-radius:12px;margin-bottom:20px">
+          <span style="font-size:36px;font-weight:900;letter-spacing:12px;color:#0F172A;font-family:monospace">${otp}</span>
+        </div>
+        <p style="color:#6b7280;font-size:13px;margin:0">This code expires in <strong>10 minutes</strong>. If you did not request a password reset, ignore this email — your password will stay unchanged.</p>
+      </div>
+      <div style="padding:12px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af">
+        Trustiva Print Suite · Account Security
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Trustiva Print Suite" <${process.env.SMTP_USER}>`,
+      to: toEmail,
+      subject: `[Trustiva] Password Reset Code: ${otp}`,
+      html,
+    });
+  } catch (err) {
+    console.error('[MAILER] Failed to send password reset email:', err.message);
+    console.log(`[OTP] Password reset OTP for ${toEmail}: ${otp}`);
+  }
+}
+
+module.exports = { sendSignupRequestEmail, sendDeleteOtpEmail, sendPasswordResetEmail };
