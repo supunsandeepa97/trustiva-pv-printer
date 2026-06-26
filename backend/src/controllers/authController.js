@@ -1,3 +1,4 @@
+const crypto   = require('crypto');
 const bcrypt   = require('bcryptjs');
 const pool     = require('../config/database');
 const { sign, signRefresh, verifyRefresh } = require('../config/jwt');
@@ -110,14 +111,14 @@ async function forgotPassword(req, res, next) {
       return success(res, { message: 'If that email exists, an OTP has been sent.' });
     }
 
-    const otp     = String(Math.floor(100000 + Math.random() * 900000));
+    const otp     = String(crypto.randomInt(100000, 1000000));
     const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const user    = result.rows[0];
 
     await pool.query(
       `INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)
        ON CONFLICT (company_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [user.company_id, `otp_${user.id}`, JSON.stringify({ otp, expires })]
+      [user.company_id, `otp_${user.id}`, JSON.stringify({ otp, expires, attempts: 0 })]
     );
 
     await sendPasswordResetEmail(otp, email.toLowerCase().trim());
@@ -144,9 +145,32 @@ async function resetPassword(req, res, next) {
     );
     if (!settingResult.rows[0]) return error(res, 'No OTP found. Please request a new one.', 400);
 
-    const { otp: storedOtp, expires } = JSON.parse(settingResult.rows[0].value);
-    if (new Date() > new Date(expires)) return error(res, 'OTP has expired', 400);
-    if (otp !== storedOtp) return error(res, 'Invalid OTP', 400);
+    const stored = JSON.parse(settingResult.rows[0].value);
+    const { otp: storedOtp, expires } = stored;
+    const attempts = stored.attempts || 0;
+    if (new Date() > new Date(expires)) {
+      await pool.query(
+        'DELETE FROM settings WHERE company_id = $1 AND key = $2',
+        [user.company_id, `otp_${user.id}`]
+      );
+      return error(res, 'OTP has expired', 400);
+    }
+    if (otp !== storedOtp) {
+      const newAttempts = attempts + 1;
+      if (newAttempts >= 5) {
+        // Too many wrong tries — invalidate the OTP and force a fresh request
+        await pool.query(
+          'DELETE FROM settings WHERE company_id = $1 AND key = $2',
+          [user.company_id, `otp_${user.id}`]
+        );
+        return error(res, 'Too many incorrect attempts. Please request a new OTP.', 400);
+      }
+      await pool.query(
+        `UPDATE settings SET value = $1, updated_at = NOW() WHERE company_id = $2 AND key = $3`,
+        [JSON.stringify({ otp: storedOtp, expires, attempts: newAttempts }), user.company_id, `otp_${user.id}`]
+      );
+      return error(res, 'Invalid OTP', 400);
+    }
 
     if (!password || password.length < 8)        return error(res, 'Password must be at least 8 characters', 400);
     if (!/[A-Z]/.test(password))                 return error(res, 'Password must contain an uppercase letter', 400);

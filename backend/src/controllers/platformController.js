@@ -136,7 +136,7 @@ async function requestDeleteOtp(req, res, next) {
       `SELECT name FROM companies WHERE id = $1 AND deleted_at IS NULL`, [id]
     );
     if (!r.rows[0]) return error(res, 'Company not found', 404);
-    const otp = otpSvc.set(id);
+    const otp = await otpSvc.set(id);
     await sendDeleteOtpEmail(otp, r.rows[0].name);
     return success(res, { message: 'OTP sent to admin email' });
   } catch (err) { next(err); }
@@ -148,7 +148,7 @@ async function deleteCompany(req, res, next) {
     const { id } = req.params;
     const { otp } = req.body;
     if (!otp) return error(res, 'OTP is required', 400);
-    if (!otpSvc.verify(otp, id)) return error(res, 'Invalid or expired OTP', 400);
+    if (!(await otpSvc.verify(otp, id))) return error(res, 'Invalid or expired OTP', 400);
 
     // Protect platform owner's company
     const ownerCheck = await client.query(
