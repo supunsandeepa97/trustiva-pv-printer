@@ -1,16 +1,33 @@
 const { Pool } = require('pg');
 
+// On Vercel each serverless instance handles ~one request at a time and should
+// route through Neon's POOLED (-pooler) connection string. Keep the per-instance
+// pool tiny so many concurrent lambdas don't exhaust Neon's connection limit;
+// keepAlive avoids re-handshaking warm connections. Locally, use a larger pool.
+const IS_SERVERLESS = !!process.env.VERCEL;
+const POOL_MAX      = IS_SERVERLESS ? 3 : 20;
+const IDLE_MS       = IS_SERVERLESS ? 10_000 : 30_000;
+
 const PRIMARY_CONFIG = process.env.DATABASE_URL
-  ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 20, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000 }
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      max: POOL_MAX,
+      idleTimeoutMillis: IDLE_MS,
+      connectionTimeoutMillis: 10_000,
+      keepAlive: true,
+      allowExitOnIdle: IS_SERVERLESS,
+    }
   : {
       host:     process.env.DB_HOST     || 'localhost',
       port:     parseInt(process.env.DB_PORT || '5432'),
       database: process.env.DB_NAME     || 'trustiva_pv',
       user:     process.env.DB_USER     || 'postgres',
       password: process.env.DB_PASSWORD || '',
-      max: 20,
-      idleTimeoutMillis: 30_000,
+      max: POOL_MAX,
+      idleTimeoutMillis: IDLE_MS,
       connectionTimeoutMillis: 10_000,
+      keepAlive: true,
     };
 
 const primaryPool = new Pool(PRIMARY_CONFIG);
@@ -18,9 +35,11 @@ const backupPool  = process.env.BACKUP_DATABASE_URL
   ? new Pool({
       connectionString: process.env.BACKUP_DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      max: 5,
-      idleTimeoutMillis: 30_000,
+      max: IS_SERVERLESS ? 2 : 5,
+      idleTimeoutMillis: IDLE_MS,
       connectionTimeoutMillis: 8_000,
+      keepAlive: true,
+      allowExitOnIdle: IS_SERVERLESS,
     })
   : null;
 
