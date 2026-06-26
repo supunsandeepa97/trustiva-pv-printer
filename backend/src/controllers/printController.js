@@ -98,13 +98,15 @@ async function generateBulkPDFCtrl(req, res, next) {
 async function markPrinted(req, res, next) {
   try {
     const copies = parseInt(req.body.copies || 1);
+    // Scope by company first; only log the print if the voucher is actually theirs.
+    const upd = await pool.query(
+      `UPDATE payment_vouchers SET status = 'printed', updated_at = NOW() WHERE id = $1 AND company_id = $2`,
+      [req.params.id, req.user.company_id]
+    );
+    if (upd.rowCount === 0) return error(res, 'Voucher not found', 404);
     await pool.query(
       'INSERT INTO print_logs (voucher_id, printed_by, copies) VALUES ($1, $2, $3)',
       [req.params.id, req.user.id, copies]
-    );
-    await pool.query(
-      `UPDATE payment_vouchers SET status = 'printed', updated_at = NOW() WHERE id = $1 AND company_id = $2`,
-      [req.params.id, req.user.company_id]
     );
     return success(res, { message: 'Marked as printed' });
   } catch (err) { next(err); }
@@ -115,10 +117,11 @@ async function getPrintLogs(req, res, next) {
     const result = await pool.query(
       `SELECT pl.*, u.name AS printed_by_name
        FROM print_logs pl
+       JOIN payment_vouchers pv ON pv.id = pl.voucher_id
        LEFT JOIN users u ON u.id = pl.printed_by
-       WHERE pl.voucher_id = $1
+       WHERE pl.voucher_id = $1 AND pv.company_id = $2
        ORDER BY pl.printed_at DESC`,
-      [req.params.id]
+      [req.params.id, req.user.company_id]
     );
     return success(res, result.rows);
   } catch (err) { next(err); }

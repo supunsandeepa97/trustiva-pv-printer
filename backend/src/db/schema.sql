@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS companies (
   watermark_url TEXT,
   settings      JSONB DEFAULT '{}'::JSONB,
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  deleted_at    TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

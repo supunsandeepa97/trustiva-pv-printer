@@ -118,7 +118,7 @@ async function resetUserPassword(req, res, next) {
   try {
     const { id } = req.params;
     const tempPwd  = genTempPassword();
-    const hash     = await bcrypt.hash(tempPwd, 10);
+    const hash     = await bcrypt.hash(tempPwd, 12);
     const result   = await pool.query(
       `UPDATE users SET password_hash = $1, updated_at = NOW()
        WHERE id = $2 RETURNING id, name, email`,

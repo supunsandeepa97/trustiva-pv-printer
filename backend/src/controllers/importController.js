@@ -3,6 +3,17 @@ const pool   = require('../config/database');
 const engine = require('../services/importEngine');
 const { success, error } = require('../utils/apiResponse');
 
+const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
+
+// Resolve a client-supplied upload reference to a real file INSIDE the upload dir.
+// Strips any directory components and verifies the result stays within uploadDir,
+// preventing path-traversal / arbitrary file reads (e.g. "../.env", "/etc/passwd").
+function resolveUploadPath(clientPath) {
+  const safe = path.resolve(uploadDir, path.basename(String(clientPath)));
+  if (safe !== uploadDir && !safe.startsWith(uploadDir + path.sep)) return null;
+  return safe;
+}
+
 async function uploadAndPreview(req, res, next) {
   try {
     if (!req.file) return error(res, 'No file uploaded', 400);
@@ -37,20 +48,24 @@ async function uploadAndPreview(req, res, next) {
 }
 
 async function confirmImport(req, res, next) {
+  const { filePath, filename, format, mapping, skipDuplicates = true, batchName, mappingTemplate } = req.body;
+
+  if (!filePath || !mapping) return error(res, 'filePath and mapping are required', 400);
+
+  // Never trust the client-supplied path — confine it to the upload directory.
+  const safePath = resolveUploadPath(filePath);
+  if (!safePath) return error(res, 'Invalid file path', 400);
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const { filePath, filename, format, mapping, skipDuplicates = true, batchName, mappingTemplate } = req.body;
-
-    if (!filePath || !mapping) return error(res, 'filePath and mapping are required', 400);
-
-    const { headers, rows } = engine.parseFile(filePath);
+    const { headers, rows } = engine.parseFile(safePath);
     const mappedRows        = engine.applyMapping(rows, headers, mapping);
 
     const result = await engine.saveImport({
-      filePath,
-      filename:        filename || path.basename(filePath),
+      filePath:        safePath,
+      filename:        filename || path.basename(safePath),
       format:          format || 'csv',
       mappedRows,
       skipDuplicates,
