@@ -8,7 +8,9 @@
     "dev": "nodemon src/index.js",
     "db:migrate": "psql -U postgres -d trustiva_pv -f src/db/schema.sql",
     "db:seed": "psql -U postgres -d trustiva_pv -f src/db/seed.sql",
-    "db:setup": "npm run db:migrate && npm run db:seed"
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "test": "jest",
+    "lint": "eslint src"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

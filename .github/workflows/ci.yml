@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm install --no-audit --no-fund
+      # Test/lint tooling is installed here (not in package.json) so package.json
+      # stays in sync with package-lock.json and never affects the Vercel deploy.
+      - run: npm install --no-save --no-audit --no-fund jest@^29 supertest@^6 eslint@^8
+      - run: npm run lint --if-present
+      - run: npm test --if-present
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint --if-present
+      - run: npx tsc --noEmit
