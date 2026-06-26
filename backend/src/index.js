@@ -79,6 +79,15 @@ app.post('/api/v1/backup/run', async (req, res) => {
   res.json({ success: true, data: { message: 'Backup started in background' } });
 });
 
+// ─── Vercel Cron backup trigger ──────────────────────────────
+app.get('/api/v1/backup/run', async (req, res) => {
+  if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  runBackup().catch(console.error);
+  res.json({ success: true, data: { message: 'Backup started in background' } });
+});
+
 // ─── 404 ────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
