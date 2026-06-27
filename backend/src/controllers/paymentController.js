@@ -41,10 +41,14 @@ async function deleteVoucher(req, res, next) {
   } catch (err) { next(err); }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function bulkAction(req, res, next) {
   try {
     const { ids, action } = req.body;
-    if (!ids?.length || !action) return error(res, 'ids and action required', 400);
+    if (!Array.isArray(ids) || ids.length === 0 || !action) return error(res, 'ids and action required', 400);
+    if (ids.length > 1000) return error(res, 'Too many items (max 1000 per request)', 400);
+    if (!ids.every(id => typeof id === 'string' && UUID_RE.test(id))) return error(res, 'ids must be valid UUIDs', 400);
     await svc.bulkAction(ids, action, req.user.company_id);
     return success(res, { message: 'Bulk action applied', count: ids.length });
   } catch (err) { next(err); }

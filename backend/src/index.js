@@ -13,16 +13,19 @@ const app  = express();
 const PORT = process.env.PORT || 4000;
 
 // ─── Security ──────────────────────────────────────────────
+app.set('trust proxy', 1); // behind Vercel's proxy — required for correct client IP in rate limiting
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images from /uploads
 }));
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(s => s.trim());
+const allowAnyOrigin = allowedOrigins.includes('*');
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.some(o => o === '*' || o === origin)) return cb(null, true);
+    if (!origin || allowAnyOrigin || allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
-  credentials: true,
+  // Never combine a wildcard origin with credentials — unsafe and rejected by browsers.
+  credentials: !allowAnyOrigin,
 }));
 
 // ─── Body parsing ───────────────────────────────────────────
@@ -35,12 +38,23 @@ if (!process.env.VERCEL) {
   app.use('/generated-pdfs', express.static(path.resolve(process.env.PDF_DIR   || './generated-pdfs')));
 }
 
-// ─── Rate limiting on auth ──────────────────────────────────
+// ─── Rate limiting ──────────────────────────────────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max:      15,
+  standardHeaders: true,
+  legacyHeaders:   false,
   message:  { success: false, message: 'Too many requests. Please try again later.' },
 });
+// Generous global safety-net limiter (well above normal usage) against abuse.
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max:      1000,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message:  { success: false, message: 'Too many requests. Please try again later.' },
+});
+app.use('/api/', globalLimiter);
 
 // ─── Routes ─────────────────────────────────────────────────
 app.use('/api/v1/auth',      authLimiter, require('./routes/authRoutes'));

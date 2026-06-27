@@ -196,7 +196,10 @@ async function resetPassword(req, res, next) {
 async function getMe(req, res, next) {
   try {
     const result = await pool.query(
-      'SELECT id, company_id, name, email, role, created_at FROM users WHERE id = $1',
+      `SELECT u.id, u.company_id, u.name, u.email, u.role, u.is_platform_admin,
+              u.approval_status, u.created_at, c.name AS company_name
+       FROM users u JOIN companies c ON c.id = u.company_id
+       WHERE u.id = $1`,
       [req.user.id]
     );
     return success(res, result.rows[0]);

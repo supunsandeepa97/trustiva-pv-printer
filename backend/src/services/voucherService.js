@@ -4,7 +4,9 @@ const { generateVoucherNumber } = require('../utils/numberGenerator');
 const { parseAmount, parseDate, computeDuplicateHash } = require('./importEngine');
 
 async function getVouchers(companyId, filters = {}) {
-  const { status, date_from, date_to, search, import_id, page = 1, limit = 2000, sort = 'date', order = 'DESC' } = filters;
+  const { status, date_from, date_to, search, import_id, sort = 'date', order = 'DESC' } = filters;
+  const page  = Math.max(1, parseInt(filters.page, 10)  || 1);
+  const limit = Math.min(5000, Math.max(1, parseInt(filters.limit, 10) || 2000));
 
   const conditions = ['pv.company_id = $1'];
   const params     = [companyId];
@@ -26,7 +28,7 @@ async function getVouchers(companyId, filters = {}) {
   const safeOrder = allowedOrders.includes(order.toUpperCase()) ? order.toUpperCase() : 'DESC';
 
   const where  = conditions.join(' AND ');
-  const offset = (parseInt(page) - 1) * parseInt(limit);
+  const offset = (page - 1) * limit;
 
   const [dataResult, countResult] = await Promise.all([
     pool.query(
@@ -36,12 +38,12 @@ async function getVouchers(companyId, filters = {}) {
        WHERE ${where}
        ORDER BY pv.${safeSort} ${safeOrder}
        LIMIT $${p} OFFSET $${p+1}`,
-      [...params, parseInt(limit), offset]
+      [...params, limit, offset]
     ),
     pool.query(`SELECT COUNT(*) FROM payment_vouchers pv WHERE ${where}`, params),
   ]);
 
-  return { rows: dataResult.rows, total: parseInt(countResult.rows[0].count), page: parseInt(page), limit: parseInt(limit) };
+  return { rows: dataResult.rows, total: parseInt(countResult.rows[0].count), page, limit };
 }
 
 async function getVoucherById(id, companyId) {

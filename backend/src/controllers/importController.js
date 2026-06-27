@@ -56,6 +56,11 @@ async function confirmImport(req, res, next) {
   const safePath = resolveUploadPath(filePath);
   if (!safePath) return error(res, 'Invalid file path', 400);
 
+  // mapping must be a flat object of { field: columnIndex (non-negative int) }.
+  if (typeof mapping !== 'object' || Array.isArray(mapping)) return error(res, 'Invalid mapping', 400);
+  if (!Object.values(mapping).every(v => Number.isInteger(Number(v)) && Number(v) >= 0))
+    return error(res, 'Invalid mapping: column indices must be non-negative integers', 400);
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

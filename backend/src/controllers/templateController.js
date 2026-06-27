@@ -68,18 +68,29 @@ async function deleteTemplate(req, res, next) {
 }
 
 async function setDefault(req, res, next) {
+  const client = await pool.connect();
   try {
-    await pool.query(
+    await client.query('BEGIN');
+    await client.query(
       'UPDATE voucher_templates SET is_default = FALSE WHERE company_id = $1',
       [req.user.company_id]
     );
-    const result = await pool.query(
+    const result = await client.query(
       'UPDATE voucher_templates SET is_default = TRUE WHERE id = $1 AND company_id = $2 RETURNING *',
       [req.params.id, req.user.company_id]
     );
-    if (!result.rows[0]) return error(res, 'Template not found', 404);
+    if (!result.rows[0]) {
+      await client.query('ROLLBACK');
+      return error(res, 'Template not found', 404);
+    }
+    await client.query('COMMIT');
     return success(res, result.rows[0]);
-  } catch (err) { next(err); }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
 }
 
 async function duplicateTemplate(req, res, next) {

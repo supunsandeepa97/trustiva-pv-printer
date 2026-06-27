@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken');
 
 if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
-  console.warn('[SECURITY] JWT_SECRET and JWT_REFRESH_SECRET are not set. Set these environment variables immediately — do not use in production without them.');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[SECURITY] JWT_SECRET and JWT_REFRESH_SECRET must be set in production — refusing to start with insecure defaults.');
+  }
+  console.warn('[SECURITY] JWT_SECRET/JWT_REFRESH_SECRET not set — using insecure dev defaults. Do NOT use in production.');
 }
 
 const ACCESS_SECRET  = process.env.JWT_SECRET          || 'dev_access_secret_change_me';

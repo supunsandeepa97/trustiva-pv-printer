@@ -2,6 +2,8 @@ const pool   = require('../config/database');
 const { generateVoucherPDF, generateBulkPDF } = require('../services/pdfService');
 const { success, error } = require('../utils/apiResponse');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function previewVoucher(req, res, next) {
   try {
     const vResult = await pool.query(
@@ -58,7 +60,9 @@ async function generatePDF(req, res, next) {
 async function generateBulkPDFCtrl(req, res, next) {
   try {
     const { ids } = req.body;
-    if (!ids?.length) return error(res, 'ids required', 400);
+    if (!Array.isArray(ids) || ids.length === 0) return error(res, 'ids required', 400);
+    if (ids.length > 1000) return error(res, 'Too many items (max 1000 per request)', 400);
+    if (!ids.every(id => typeof id === 'string' && UUID_RE.test(id))) return error(res, 'ids must be valid UUIDs', 400);
 
     const vResult = await pool.query(
       `SELECT pv.*, vt.config AS template_config, vt.paper_size
