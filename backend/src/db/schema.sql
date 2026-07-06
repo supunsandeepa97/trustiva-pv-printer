@@ -87,6 +87,29 @@ CREATE INDEX IF NOT EXISTS idx_imports_company ON imports(company_id);
 CREATE INDEX IF NOT EXISTS idx_imports_created ON imports(company_id, created_at DESC);
 
 -- ============================================================
+-- import_staging (serverless-safe two-step upload → confirm handoff)
+-- ============================================================
+-- On Vercel, /imports/upload and /imports/confirm are separate lambda
+-- invocations that may land on different instances with different ephemeral
+-- /tmp filesystems, so the uploaded file written during "upload" is frequently
+-- gone during "confirm". Instead of re-reading the file from disk on confirm,
+-- the upload step persists the parsed rows+headers here keyed by a token; the
+-- confirm step looks them up by that token. Rows are short-lived (one import
+-- session) and cleaned up on confirm / by the expiry sweep.
+CREATE TABLE IF NOT EXISTS import_staging (
+  token        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id   UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  created_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  filename     TEXT NOT NULL,
+  format       TEXT NOT NULL,
+  payload      JSONB NOT NULL,            -- { headers: [...], rows: [[...], ...] }
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_staging_company ON import_staging(company_id);
+CREATE INDEX IF NOT EXISTS idx_import_staging_created ON import_staging(created_at);
+
+-- ============================================================
 -- payment_vouchers (core table)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS payment_vouchers (

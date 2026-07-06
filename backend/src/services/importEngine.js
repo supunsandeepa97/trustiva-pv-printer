@@ -28,6 +28,40 @@ function detectDelimiter(rawText) {
   return ',';
 }
 
+// ─── RFC4180-style delimited text parser ─────────────────────
+// A plain line.split(delim) breaks on quoted fields like "Smith, John",1500.00 —
+// it shifts every column after the quoted comma. This walks the raw text
+// character-by-character so quoted delimiters/newlines are treated as data.
+function parseDelimitedText(text, delim) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') { inQuotes = true; }
+    else if (char === delim) { row.push(field); field = ''; }
+    else if (char === '\r') { /* skip, \n below ends the row */ }
+    else if (char === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else { field += char; }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+
+  return rows;
+}
+
 // ─── Skip QuickBooks header metadata rows ────────────────────
 function skipHeaderRows(rows) {
   const knownCols = new Set([
@@ -62,10 +96,9 @@ function parseFile(filePath) {
   }
 
   // CSV / TXT
-  const rawText  = fs.readFileSync(filePath, 'utf-8');
+  const rawText  = fs.readFileSync(filePath, 'utf-8').replace(/^﻿/, ''); // strip BOM
   const delim    = ext === '.txt' ? '\t' : detectDelimiter(rawText);
-  const lines    = rawText.split(/\r?\n/);
-  const parsed   = lines.map(line => line.split(delim).map(c => c.trim().replace(/^"|"$/g, '')));
+  const parsed   = parseDelimitedText(rawText, delim).map(r => r.map(c => c.trim()));
   const { headers, dataRows } = skipHeaderRows(parsed.filter(r => r.length > 1));
   return { headers, rows: dataRows.filter(r => r.some(c => c !== '')) };
 }
@@ -230,6 +263,7 @@ async function saveImport({ filePath, filename, format, mappedRows, skipDuplicat
   // Batch insert vouchers (100 per batch)
   const BATCH = 100;
   let errorCount = 0;
+  let negativeAmountCount = 0;
 
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
@@ -243,6 +277,13 @@ async function saveImport({ filePath, filename, format, mappedRows, skipDuplicat
 
       // Skip rows that have absolutely no useful data
       if (amount === null && !row.payee_name) { errorCount++; continue; }
+
+      // A payment voucher is money going OUT — a negative/parenthesized amount is a
+      // refund/credit, not a payment. convertToWords() renders negatives as the
+      // literal "Invalid Amount", so these would print unusable vouchers. Skip and
+      // track separately (do NOT abs() — that would silently turn a refund into a
+      // payment) so the summary can flag them for manual classification.
+      if (amount !== null && amount < 0) { negativeAmountCount++; continue; }
 
       const effectiveAmount = amount ?? 0;
       const amountWords = convertToWords(effectiveAmount);
@@ -270,15 +311,20 @@ async function saveImport({ filePath, filename, format, mappedRows, skipDuplicat
     }
   }
 
-  // Update error count
-  if (errorCount > 0) {
-    await client.query(
-      'UPDATE imports SET error_count = $1 WHERE id = $2',
-      [errorCount, importId]
-    );
-  }
+  // importedRows counts only rows actually inserted (candidate rows minus skips).
+  const importedRows = rows.length - errorCount - negativeAmountCount;
 
-  return { importId, totalRows: mappedRows.length, importedRows: rows.length, duplicateCount: dupCount, errorCount };
+  // The imports record was created with imported_rows = rows.length before the
+  // skip counts were known (importId is needed for the voucher FK inside the
+  // loop). Reconcile now. There's no negative_amount_count column, so fold the
+  // negative-amount skips into the persisted error_count; the broken-out
+  // negativeAmountCount is still returned to the API/frontend below.
+  await client.query(
+    'UPDATE imports SET imported_rows = $1, error_count = $2 WHERE id = $3',
+    [importedRows, errorCount + negativeAmountCount, importId]
+  );
+
+  return { importId, totalRows: mappedRows.length, importedRows, duplicateCount: dupCount, errorCount, negativeAmountCount };
 }
 
 module.exports = {

@@ -80,6 +80,7 @@ export default function TemplatesPage() {
         <div className="flex-1 min-w-0">
           {selected && company ? (
             <TemplateEditor
+              key={selected.id}
               template={selected}
               company={company}
               onSaved={() => { load(); }}

@@ -24,8 +24,10 @@ export default function PaymentHistoryPage() {
     fetchVouchers({ page: 1, limit: 20, sort: 'date', order: 'DESC' });
   }, []);
 
-  const handleFilter = useCallback(() => {
-    fetchVouchers({ ...filters, page: 1, limit: 20 });
+  const handleFilter = useCallback((next?: Record<string, unknown>) => {
+    // Use the filters passed up from PaymentFilters (fresh) rather than the
+    // closed-over `filters` from this render, which lags one step behind.
+    fetchVouchers({ ...(next ?? filters), page: 1, limit: 20 });
   }, [filters, fetchVouchers]);
 
   function goToPage(p: number) {

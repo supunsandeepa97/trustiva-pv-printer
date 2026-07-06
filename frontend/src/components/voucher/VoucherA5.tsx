@@ -32,7 +32,7 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 0; }
+          @page { size: A5 portrait; margin: 0; }
           body  { margin: 0; }
           .no-print { display: none !important; }
         }
@@ -41,10 +41,10 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
       <div
         ref={ref}
         style={{
-          width:           '210mm',
-          minHeight:       '297mm',
+          width:           '148mm',
+          minHeight:       '210mm',
           fontFamily:      "'Arial', sans-serif",
-          fontSize:        '10pt',
+          fontSize:        '8.5pt',
           color:           '#111',
           backgroundColor: '#fff',
           display:         'flex',
@@ -54,38 +54,38 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
         }}
       >
         {/* ── TOP ACCENT BAR ─────────────────────────────────── */}
-        <div style={{ height: '5mm', backgroundColor: NAVY, flexShrink: 0 }} />
+        <div style={{ height: '3.5mm', backgroundColor: NAVY, flexShrink: 0 }} />
 
         {/* ── MAIN CONTENT AREA ──────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8mm 12mm 10mm' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '6mm 8mm 6mm' }}>
 
           {/* ── HEADER ───────────────────────────────────────── */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6mm' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '4mm' }}>
 
             {/* Left: logo + company details */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4mm' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3mm' }}>
               {company.logo_url && (
                 <img
                   src={company.logo_url}
                   alt="Logo"
-                  style={{ width: '70px', height: '70px', objectFit: 'contain', flexShrink: 0 }}
+                  style={{ width: '52px', height: '52px', objectFit: 'contain', flexShrink: 0 }}
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
               )}
               <div>
-                <div style={{ fontWeight: '800', fontSize: '16pt', color: NAVY, lineHeight: '1.15' }}>
+                <div style={{ fontWeight: '800', fontSize: '13pt', color: NAVY, lineHeight: '1.15' }}>
                   {company.name || 'COMPANY NAME'}
                 </div>
                 {company.address && (
-                  <div style={{ fontSize: '8.5pt', color: '#6B7280', marginTop: '2px', maxWidth: '80mm' }}>
+                  <div style={{ fontSize: '7.5pt', color: '#6B7280', marginTop: '2px', maxWidth: '55mm' }}>
                     {company.address}
                   </div>
                 )}
                 {company.phone && (
-                  <div style={{ fontSize: '8.5pt', color: '#6B7280' }}>{company.phone}</div>
+                  <div style={{ fontSize: '7.5pt', color: '#6B7280' }}>{company.phone}</div>
                 )}
                 {company.email && (
-                  <div style={{ fontSize: '8.5pt', color: '#6B7280' }}>{company.email}</div>
+                  <div style={{ fontSize: '7.5pt', color: '#6B7280' }}>{company.email}</div>
                 )}
               </div>
             </div>
@@ -96,9 +96,9 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
                 backgroundColor: NAVY,
                 color:           '#fff',
                 fontWeight:      '700',
-                fontSize:        '11pt',
-                letterSpacing:   '1.5px',
-                padding:         '4mm 6mm',
+                fontSize:        '9pt',
+                letterSpacing:   '1px',
+                padding:         '2.5mm 4mm',
                 borderRadius:    '4px',
                 display:         'inline-block',
               }}>
@@ -108,7 +108,7 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
           </div>
 
           {/* ── INFO GRID TABLE ──────────────────────────────── */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '5mm', border: BORDER }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3.5mm', border: BORDER }}>
             <tbody>
               {/* Row 1: Bank | Date */}
               <tr>
@@ -145,8 +145,8 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
                 {(['Account', 'Description', 'Amount'] as const).map((h, i) => (
                   <th key={h} style={{
                     border:          BORDER,
-                    padding:         '2.5mm 3.5mm',
-                    fontSize:        '9.5pt',
+                    padding:         '2mm 3mm',
+                    fontSize:        '8.5pt',
                     fontWeight:      '700',
                     color:           NAVY,
                     backgroundColor: GRAY,
@@ -160,13 +160,13 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
             </thead>
             <tbody>
               <tr>
-                <td style={{ border: BORDER, padding: '3mm 3.5mm', height: '38mm', verticalAlign: 'top', fontSize: '10pt' }}>
+                <td style={{ border: BORDER, padding: '2.5mm 3mm', height: '24mm', verticalAlign: 'top', fontSize: '8.5pt' }}>
                   {voucher.account_name || ''}
                 </td>
-                <td style={{ border: BORDER, padding: '3mm 3.5mm', height: '38mm', verticalAlign: 'top', fontSize: '10pt' }}>
+                <td style={{ border: BORDER, padding: '2.5mm 3mm', height: '24mm', verticalAlign: 'top', fontSize: '8.5pt' }}>
                   {voucher.description || ''}
                 </td>
-                <td style={{ border: BORDER, padding: '3mm 3.5mm', height: '38mm', verticalAlign: 'top', textAlign: 'right', fontWeight: '600', fontSize: '10pt' }}>
+                <td style={{ border: BORDER, padding: '2.5mm 3mm', height: '24mm', verticalAlign: 'top', textAlign: 'right', fontWeight: '600', fontSize: '8.5pt' }}>
                   {voucher.amount ? formatCurrency(voucher.amount, voucher.currency) : ''}
                 </td>
               </tr>
@@ -174,18 +174,18 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
           </table>
 
           {/* ── AMOUNT IN WORDS + TOTAL ───────────────────────── */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '7mm' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm' }}>
             <tbody>
               <tr>
                 <td style={{
                   border:          BORDER,
                   borderTop:       'none',
-                  padding:         '3.5mm 3.5mm',
+                  padding:         '2.5mm 3mm',
                   backgroundColor: '#F9FAFB',
                   verticalAlign:   'middle',
                 }}>
                   {isVisible('amount_words', template) && (
-                    <span style={{ fontSize: '9.5pt' }}>
+                    <span style={{ fontSize: '8.5pt' }}>
                       <span style={{ fontWeight: '600', color: LABEL }}>Amount In Words: </span>
                       <span style={{ fontStyle: 'italic', color: '#111' }}>{voucher.amount_words || ''}</span>
                     </span>
@@ -195,11 +195,11 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
                   border:          BORDER,
                   borderTop:       'none',
                   borderLeft:      'none',
-                  padding:         '3.5mm 3.5mm',
+                  padding:         '2.5mm 3mm',
                   width:           '22%',
                   textAlign:       'right',
                   fontWeight:      '800',
-                  fontSize:        '11pt',
+                  fontSize:        '9.5pt',
                   color:           NAVY,
                   backgroundColor: '#F9FAFB',
                   whiteSpace:      'nowrap',
@@ -214,57 +214,57 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
           </table>
 
           {/* Spacer */}
-          <div style={{ flex: 1, minHeight: '10mm' }} />
+          <div style={{ flex: 1, minHeight: '5mm' }} />
 
           {/* ── SIGNATURE SECTION ────────────────────────────── */}
           {isVisible('signature', template) && (
             <>
               {/* 3 signature boxes */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '5mm', marginBottom: '5mm' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '3.5mm', marginBottom: '3.5mm' }}>
                 {[sigLabels.left, sigLabels.center, sigLabels.right].map((label, i) => (
                   <div key={i} style={{
                     border:       BORDER,
                     borderRadius: '3px',
-                    padding:      '3mm 4mm',
+                    padding:      '2mm 2.5mm',
                     textAlign:    'center',
                   }}>
                     <div style={{
-                      fontSize:         '8pt',
+                      fontSize:         '7pt',
                       fontWeight:       '700',
                       color:            NAVY,
                       textTransform:    'uppercase',
                       letterSpacing:    '0.5px',
                       borderBottom:     `1px solid #E5E7EB`,
-                      paddingBottom:    '2mm',
-                      marginBottom:     '2mm',
+                      paddingBottom:    '1.5mm',
+                      marginBottom:     '1.5mm',
                     }}>
                       {label}
                     </div>
                     {/* signing space */}
-                    <div style={{ height: '22mm' }} />
-                    <div style={{ borderTop: '1.5px solid #374151', marginTop: '2mm' }} />
+                    <div style={{ height: '13mm' }} />
+                    <div style={{ borderTop: '1.5px solid #374151', marginTop: '1.5mm' }} />
                   </div>
                 ))}
               </div>
 
               {/* Received by box */}
-              <div style={{ border: BORDER, borderRadius: '3px', padding: '3mm 4mm' }}>
+              <div style={{ border: BORDER, borderRadius: '3px', padding: '2mm 2.5mm' }}>
                 <div style={{
-                  fontSize:      '8pt',
+                  fontSize:      '7pt',
                   fontWeight:    '700',
                   color:         NAVY,
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',
                   borderBottom:  `1px solid #E5E7EB`,
-                  paddingBottom: '2mm',
-                  marginBottom:  '3mm',
+                  paddingBottom: '1.5mm',
+                  marginBottom:  '2mm',
                 }}>
                   Received by
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6mm' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5mm' }}>
                   {['Name', 'Signature'].map(lbl => (
                     <div key={lbl}>
-                      <div style={{ fontSize: '8.5pt', color: LABEL, marginBottom: '16mm' }}>{lbl} :</div>
+                      <div style={{ fontSize: '7.5pt', color: LABEL, marginBottom: '9mm' }}>{lbl} :</div>
                       <div style={{ borderBottom: '1.5px solid #374151' }} />
                     </div>
                   ))}
@@ -279,7 +279,7 @@ const VoucherA5 = forwardRef<HTMLDivElement, VoucherA5Props>(function VoucherA5(
         <div style={{
           backgroundColor: GRAY,
           borderTop:       BORDER,
-          padding:         '2mm 12mm',
+          padding:         '2mm 8mm',
           display:         'flex',
           justifyContent:  'space-between',
           alignItems:      'center',
@@ -306,13 +306,13 @@ function Cell({
       colSpan={colSpan}
       style={{
         border:        BORDER,
-        padding:       '2mm 3mm',
+        padding:       '1.5mm 2.5mm',
         verticalAlign: 'top',
         width:         w,
       }}
     >
-      <div style={{ fontSize: '7.5pt', color: LABEL, marginBottom: '1mm' }}>{label}</div>
-      <div style={{ fontSize: '10pt', fontWeight: bold ? '700' : '500', color: '#111' }}>{value || '—'}</div>
+      <div style={{ fontSize: '6.5pt', color: LABEL, marginBottom: '0.5mm' }}>{label}</div>
+      <div style={{ fontSize: '8.5pt', fontWeight: bold ? '700' : '500', color: '#111' }}>{value || '—'}</div>
     </td>
   );
 }

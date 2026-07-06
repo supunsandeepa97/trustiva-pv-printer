@@ -1,18 +1,15 @@
 const path   = require('path');
+const fs     = require('fs');
 const pool   = require('../config/database');
 const engine = require('../services/importEngine');
 const { success, error } = require('../utils/apiResponse');
 
-const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
+// A UUID matcher for the opaque staging token round-tripped by the frontend as
+// `filePath`/`path`. Guards the confirm lookup against garbage / injection.
+const TOKEN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Resolve a client-supplied upload reference to a real file INSIDE the upload dir.
-// Strips any directory components and verifies the result stays within uploadDir,
-// preventing path-traversal / arbitrary file reads (e.g. "../.env", "/etc/passwd").
-function resolveUploadPath(clientPath) {
-  const safe = path.resolve(uploadDir, path.basename(String(clientPath)));
-  if (safe !== uploadDir && !safe.startsWith(uploadDir + path.sep)) return null;
-  return safe;
-}
+// How long a staged upload stays valid before confirm must re-upload.
+const STAGING_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 async function uploadAndPreview(req, res, next) {
   try {
@@ -25,6 +22,27 @@ async function uploadAndPreview(req, res, next) {
     const { headers, rows } = engine.parseFile(filePath);
     if (!headers.length) return error(res, 'Could not parse file or file is empty', 400);
 
+    // Persist the parsed payload server-side so /imports/confirm never needs the
+    // ephemeral file again. On Vercel, confirm may hit a different lambda whose
+    // /tmp does not contain this upload — reading from disk there fails with
+    // ENOENT. The returned token IS the `path` the frontend round-trips.
+    const staged = await pool.query(
+      `INSERT INTO import_staging (company_id, created_by, filename, format, payload)
+       VALUES ($1, $2, $3, $4, $5) RETURNING token`,
+      [
+        req.user.company_id,
+        req.user.id,
+        req.file.originalname,
+        format,
+        JSON.stringify({ headers, rows }),
+      ]
+    );
+    const token = staged.rows[0].token;
+
+    // The on-disk copy is no longer needed once parsed rows are staged in the DB.
+    // Best-effort cleanup; harmless if the file is already gone.
+    try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+
     const suggestedMapping = engine.autoMapColumns(headers);
     const previewRows      = rows.slice(0, 10).map(row =>
       Object.fromEntries(headers.map((h, i) => [h, row[i] ?? '']))
@@ -32,8 +50,10 @@ async function uploadAndPreview(req, res, next) {
 
     return success(res, {
       file: {
-        path:         filePath,
-        filename:     req.file.filename,
+        // Opaque token the frontend passes back as `filePath` on confirm.
+        // Named `path` to preserve the existing frontend API contract.
+        path:         token,
+        filename:     req.file.originalname,
         originalName: req.file.originalname,
         format,
         totalRows:    rows.length,
@@ -52,9 +72,10 @@ async function confirmImport(req, res, next) {
 
   if (!filePath || !mapping) return error(res, 'filePath and mapping are required', 400);
 
-  // Never trust the client-supplied path — confine it to the upload directory.
-  const safePath = resolveUploadPath(filePath);
-  if (!safePath) return error(res, 'Invalid file path', 400);
+  // `filePath` is now the opaque staging token issued by /imports/upload, not a
+  // filesystem path. Validate its shape before hitting the DB.
+  const token = String(filePath);
+  if (!TOKEN_RE.test(token)) return error(res, 'Invalid or expired upload session — please re-upload', 400);
 
   // mapping must be a flat object of { field: columnIndex (non-negative int) }.
   if (typeof mapping !== 'object' || Array.isArray(mapping)) return error(res, 'Invalid mapping', 400);
@@ -65,19 +86,40 @@ async function confirmImport(req, res, next) {
   try {
     await client.query('BEGIN');
 
-    const { headers, rows } = engine.parseFile(safePath);
-    const mappedRows        = engine.applyMapping(rows, headers, mapping);
+    // Look the parsed rows up by token — scoped to the caller's company so one
+    // tenant can't confirm another's staged upload. Expired rows are treated as
+    // not found so the user gets a clear re-upload message, not a stale import.
+    const staged = await client.query(
+      `SELECT filename, format, payload, created_at
+         FROM import_staging
+        WHERE token = $1 AND company_id = $2`,
+      [token, req.user.company_id]
+    );
+
+    const stagingRow = staged.rows[0];
+    if (!stagingRow || (Date.now() - new Date(stagingRow.created_at).getTime()) > STAGING_TTL_MS) {
+      await client.query('ROLLBACK');
+      return error(res, 'Upload session expired — please re-upload', 400);
+    }
+
+    const payload = stagingRow.payload || {};
+    const headers = Array.isArray(payload.headers) ? payload.headers : [];
+    const rows    = Array.isArray(payload.rows)    ? payload.rows    : [];
+
+    const mappedRows = engine.applyMapping(rows, headers, mapping);
 
     const result = await engine.saveImport({
-      filePath:        safePath,
-      filename:        filename || path.basename(safePath),
-      format:          format || 'csv',
+      filename:        filename || stagingRow.filename,
+      format:          format || stagingRow.format || 'csv',
       mappedRows,
       skipDuplicates,
       userId:          req.user.id,
       companyId:       req.user.company_id,
       mappingTemplate,
     }, client);
+
+    // Consume the staging row so it can't be replayed and doesn't accumulate.
+    await client.query('DELETE FROM import_staging WHERE token = $1', [token]);
 
     await client.query('COMMIT');
 

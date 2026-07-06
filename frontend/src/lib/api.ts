@@ -23,7 +23,11 @@ api.interceptors.response.use(
   res => res,
   async error => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // A 401 from an auth endpoint (wrong password, bad OTP, etc.) is an expected
+    // response, not an expired session — don't trigger the refresh/redirect flow,
+    // which would reload the page and wipe the on-screen error message.
+    const isAuthEndpoint = typeof originalRequest.url === 'string' && originalRequest.url.includes('/auth/');
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           refreshQueue.push((token, err) => {

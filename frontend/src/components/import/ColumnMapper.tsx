@@ -1,6 +1,6 @@
 ﻿'use client';
 import { useState } from 'react';
-import { ChevronRight, Wand2 } from 'lucide-react';
+import { ChevronRight, Loader2, Wand2 } from 'lucide-react';
 import { useImportStore } from '@/store/importStore';
 import type { ColumnMapping } from '@/types';
 
@@ -18,15 +18,26 @@ const TRUSTIVA_FIELDS = [
 ];
 
 interface ColumnMapperProps {
-  onConfirm: (mapping: ColumnMapping) => void;
+  onConfirm: (mapping: ColumnMapping) => void | Promise<void>;
 }
 
 export default function ColumnMapper({ onConfirm }: ColumnMapperProps) {
   const { preview } = useImportStore();
   const [mapping, setMapping] = useState<ColumnMapping>(preview?.suggestedMapping || {});
+  const [submitting, setSubmitting] = useState(false);
 
   if (!preview) return null;
   const { headers, previewRows } = preview;
+
+  async function handleConfirm() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onConfirm(mapping);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const getColIdx = (key: string) => mapping[key];
   const getSample = (colIdx: number) => {
@@ -97,11 +108,13 @@ export default function ColumnMapper({ onConfirm }: ColumnMapperProps) {
       )}
 
       <button
-        onClick={() => onConfirm(mapping)}
-        disabled={missingRequired.length > 0}
+        onClick={handleConfirm}
+        disabled={missingRequired.length > 0 || submitting}
         className="w-full bg-gold-600 hover:bg-gold-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition"
       >
-        Confirm Mapping &amp; Import <ChevronRight className="w-4 h-4" />
+        {submitting
+          ? <><Loader2 className="w-4 h-4 animate-spin" /> Importing…</>
+          : <>Confirm Mapping &amp; Import <ChevronRight className="w-4 h-4" /></>}
       </button>
     </div>
   );

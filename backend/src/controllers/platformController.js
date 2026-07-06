@@ -1,3 +1,4 @@
+const crypto  = require('crypto');
 const pool    = require('../config/database');
 const bcrypt  = require('bcryptjs');
 const { success, error } = require('../utils/apiResponse');
@@ -7,12 +8,15 @@ const { sendDeleteOtpEmail } = require('../services/mailerService');
 function genTempPassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let pwd = '';
-  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 10; i++) pwd += chars[crypto.randomInt(0, chars.length)];
   return pwd;
 }
 
 async function listCompanies(req, res, next) {
   try {
+    // Users and vouchers are aggregated separately (not joined together) —
+    // joining both tables directly and using COUNT(DISTINCT)/SUM over the
+    // combined result multiplies voucher totals by the company's user count.
     const result = await pool.query(`
       SELECT
         c.id,
@@ -21,15 +25,20 @@ async function listCompanies(req, res, next) {
         c.phone,
         c.is_active,
         c.created_at,
-        COUNT(DISTINCT u.id)::INT                                      AS user_count,
-        COUNT(DISTINCT pv.id)::INT                                     AS voucher_count,
-        COALESCE(SUM(pv.amount), 0)::NUMERIC                          AS total_amount,
-        MAX(pv.created_at)                                             AS last_activity
+        COALESCE(u.user_count, 0)::INT       AS user_count,
+        COALESCE(v.voucher_count, 0)::INT    AS voucher_count,
+        COALESCE(v.total_amount, 0)::NUMERIC AS total_amount,
+        v.last_activity
       FROM companies c
-      LEFT JOIN users u  ON u.company_id  = c.id
-      LEFT JOIN payment_vouchers pv ON pv.company_id = c.id
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS user_count
+        FROM users WHERE users.company_id = c.id
+      ) u ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS voucher_count, SUM(amount) AS total_amount, MAX(created_at) AS last_activity
+        FROM payment_vouchers WHERE payment_vouchers.company_id = c.id
+      ) v ON true
       WHERE c.deleted_at IS NULL
-      GROUP BY c.id
       ORDER BY c.created_at DESC
     `);
     return success(res, result.rows);

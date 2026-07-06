@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const pool   = require('../config/database');
 const { success, error } = require('../utils/apiResponse');
+const { isReservedKey } = require('../utils/reservedSettingsKeys');
 
 async function getCompany(req, res, next) {
   try {
@@ -16,7 +17,7 @@ async function getCompany(req, res, next) {
       [req.user.company_id]
     );
     const settings = {};
-    settingsResult.rows.forEach(row => { settings[row.key] = row.value; });
+    settingsResult.rows.forEach(row => { if (!isReservedKey(row.key)) settings[row.key] = row.value; });
 
     return success(res, { ...company, settings });
   } catch (err) {
@@ -145,6 +146,7 @@ async function createUser(req, res, next) {
     );
     return success(res, result.rows[0], 201);
   } catch (err) {
+    if (err.code === '23505') return error(res, 'Email already registered', 409);
     next(err);
   }
 }

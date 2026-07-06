@@ -96,7 +96,8 @@ export default function PaymentPrintPage() {
   // Step 3
   const [printType, setPrintType] = useState<PrintType>('voucher');
   const printRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({ content: () => printRef.current });
+  // handlePrint is defined below, after selectedVouchers, so onAfterPrint can
+  // mark exactly the printed vouchers as 'printed'.
 
   useEffect(() => {
     Promise.all([CompanyAPI.get(), TemplateAPI.list(), SettingsAPI.get()])
@@ -136,7 +137,7 @@ export default function PaymentPrintPage() {
         filename:       preview.file.originalName,
         format:         preview.file.format,
         mapping:        preview.suggestedMapping,
-        skipDuplicates: false,
+        skipDuplicates: true,
       });
       setProgress(95);
 
@@ -198,6 +199,27 @@ export default function PaymentPrintPage() {
 
   const selectedVouchers = vouchers.filter(v => selected.has(v.id));
   const allSelected      = selected.size === vouchers.length && vouchers.length > 0;
+
+  // After the browser print dialog closes, mark the printed vouchers as 'printed'
+  // so dashboard stats, history badges and status all reflect reality. Wrapped in
+  // try/catch so a failed status update surfaces an honest message instead of an
+  // unhandled rejection + false "success".
+  const markSelectedPrinted = useCallback(async () => {
+    const ids = vouchers.filter(v => selected.has(v.id)).map(v => v.id);
+    if (!ids.length) return;
+    try {
+      await PaymentAPI.bulkAction(ids, 'mark_printed');
+      setVouchers(prev => prev.map(v => (selected.has(v.id) ? { ...v, status: 'printed' } : v)));
+      notify({ type: 'success', message: `Marked ${ids.length} voucher${ids.length > 1 ? 's' : ''} as printed` });
+    } catch {
+      notify({ type: 'error', message: 'Printed, but updating voucher status failed — please refresh.' });
+    }
+  }, [vouchers, selected, notify]);
+
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+    onAfterPrint: () => { void markSelectedPrinted(); },
+  });
 
   /* ── Render ──────────────────────────────────────────────── */
   return (

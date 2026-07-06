@@ -2,7 +2,10 @@ const multer = require('multer');
 const path   = require('path');
 const fs     = require('fs');
 
-const uploadDir = process.env.UPLOAD_DIR || './uploads';
+// On Vercel the deployment bundle is read-only; only /tmp is writable. Fall back
+// to /tmp/uploads there so multer's diskStorage + mkdir below don't crash with
+// EROFS/EACCES. Locally (or with UPLOAD_DIR set) keep the existing ./uploads.
+const uploadDir = process.env.UPLOAD_DIR || (process.env.VERCEL ? '/tmp/uploads' : './uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({

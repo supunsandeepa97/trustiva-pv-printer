@@ -4,27 +4,31 @@ import { Search, X } from 'lucide-react';
 import { usePaymentsStore } from '@/store/paymentsStore';
 import { debounce } from '@/lib/utils';
 
-export default function PaymentFilters({ onFilter }: { onFilter: () => void }) {
+// onFilter receives the freshly-computed filters so the parent doesn't fetch
+// with a stale `filters` value (React state hasn't re-rendered yet when we call it).
+export default function PaymentFilters({ onFilter }: { onFilter: (next?: Record<string, unknown>) => void }) {
   const { filters, setFilters } = usePaymentsStore();
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useCallback(
     debounce((val: string) => {
-      setFilters({ ...filters, search: val || undefined, page: 1 });
-      onFilter();
+      const next = { ...filters, search: val || undefined, page: 1 };
+      setFilters(next);
+      onFilter(next);
     }, 350),
     [filters, setFilters, onFilter]
   );
 
   function updateFilter(key: string, value: string) {
-    setFilters({ ...filters, [key]: value || undefined, page: 1 });
-    onFilter();
+    const next = { ...filters, [key]: value || undefined, page: 1 };
+    setFilters(next);
+    onFilter(next);
   }
 
   function clearFilters() {
     setFilters({});
     if (searchRef.current) searchRef.current.value = '';
-    onFilter();
+    onFilter({});
   }
 
   const hasFilters = filters.status || filters.date_from || filters.date_to || filters.search;

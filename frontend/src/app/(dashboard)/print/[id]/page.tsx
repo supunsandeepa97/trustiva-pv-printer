@@ -29,10 +29,10 @@ export default function PrintPage() {
     content: () => printRef.current,
     documentTitle: `${voucher?.voucher_no || 'voucher'}`,
     onAfterPrint: () => {
-      if (voucher) {
-        markPrinted(voucher.id, copies);
-        notify({ type: 'success', message: 'Voucher printed successfully' });
-      }
+      // markPrinted reports its own success/failure toast — don't show an
+      // unconditional "printed successfully" that would lie when the status
+      // update fails (and would double-toast on success).
+      if (voucher) void markPrinted(voucher.id, copies);
     },
     pageStyle: `
       @page { size: A5 portrait; margin: 0; }

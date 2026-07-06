@@ -29,8 +29,14 @@ export function usePrint() {
   }
 
   async function markPrinted(id: string, copies = 1) {
-    await PrintAPI.markPrinted(id, copies);
-    notify({ type: 'success', message: 'Marked as printed' });
+    try {
+      await PrintAPI.markPrinted(id, copies);
+      notify({ type: 'success', message: 'Marked as printed' });
+      return true;
+    } catch {
+      notify({ type: 'error', message: 'Printed, but updating status failed — please refresh.' });
+      return false;
+    }
   }
 
   return { downloadPDF, bulkDownloadPDF, markPrinted };

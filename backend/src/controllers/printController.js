@@ -4,12 +4,18 @@ const { success, error } = require('../utils/apiResponse');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function clampCopies(raw) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, 100);
+}
+
 async function previewVoucher(req, res, next) {
   try {
     const vResult = await pool.query(
       `SELECT pv.*, vt.config AS template_config, vt.name AS template_name, vt.paper_size
        FROM payment_vouchers pv
-       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id
+       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id AND vt.company_id = pv.company_id
        WHERE pv.id = $1 AND pv.company_id = $2`,
       [req.params.id, req.user.company_id]
     );
@@ -28,7 +34,7 @@ async function generatePDF(req, res, next) {
     const vResult = await pool.query(
       `SELECT pv.*, vt.config AS template_config, vt.name AS template_name, vt.paper_size
        FROM payment_vouchers pv
-       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id
+       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id AND vt.company_id = pv.company_id
        WHERE pv.id = $1 AND pv.company_id = $2`,
       [req.params.id, req.user.company_id]
     );
@@ -44,7 +50,7 @@ async function generatePDF(req, res, next) {
     // Log the print
     await pool.query(
       'INSERT INTO print_logs (voucher_id, printed_by, copies) VALUES ($1, $2, $3)',
-      [voucher.id, req.user.id, parseInt(req.query.copies || 1)]
+      [voucher.id, req.user.id, clampCopies(req.query.copies)]
     );
     await pool.query(
       `UPDATE payment_vouchers SET status = 'printed', updated_at = NOW() WHERE id = $1`,
@@ -67,7 +73,7 @@ async function generateBulkPDFCtrl(req, res, next) {
     const vResult = await pool.query(
       `SELECT pv.*, vt.config AS template_config, vt.paper_size
        FROM payment_vouchers pv
-       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id
+       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id AND vt.company_id = pv.company_id
        WHERE pv.id = ANY($1::uuid[]) AND pv.company_id = $2
        ORDER BY pv.date ASC, pv.voucher_no ASC`,
       [ids, req.user.company_id]
@@ -101,7 +107,7 @@ async function generateBulkPDFCtrl(req, res, next) {
 
 async function markPrinted(req, res, next) {
   try {
-    const copies = parseInt(req.body.copies || 1);
+    const copies = clampCopies(req.body.copies);
     // Scope by company first; only log the print if the voucher is actually theirs.
     const upd = await pool.query(
       `UPDATE payment_vouchers SET status = 'printed', updated_at = NOW() WHERE id = $1 AND company_id = $2`,

@@ -39,13 +39,9 @@ if (!process.env.VERCEL) {
 }
 
 // ─── Rate limiting ──────────────────────────────────────────
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max:      15,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  message:  { success: false, message: 'Too many requests. Please try again later.' },
-});
+// Strict per-endpoint limiting for login/reset/signup lives in authRoutes.js —
+// applying it to the whole /auth router would throttle polled endpoints
+// (/me, /refresh, /pending-requests) and lock out every user behind one IP.
 // Generous global safety-net limiter (well above normal usage) against abuse.
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -57,7 +53,7 @@ const globalLimiter = rateLimit({
 app.use('/api/', globalLimiter);
 
 // ─── Routes ─────────────────────────────────────────────────
-app.use('/api/v1/auth',      authLimiter, require('./routes/authRoutes'));
+app.use('/api/v1/auth',      require('./routes/authRoutes'));
 app.use('/api/v1/company',   require('./routes/companyRoutes'));
 app.use('/api/v1/imports',   require('./routes/importRoutes'));
 app.use('/api/v1/payments',  require('./routes/paymentRoutes'));
@@ -89,8 +85,16 @@ app.post('/api/v1/backup/run', async (req, res) => {
   if (!secret || secret !== process.env.BACKUP_SECRET) {
     return res.status(403).json({ success: false, message: 'Forbidden' });
   }
-  runBackup().catch(console.error);
-  res.json({ success: true, data: { message: 'Backup started in background' } });
+  // Await so the serverless function stays alive until the backup genuinely
+  // finishes — Vercel freezes/tears down the function right after the
+  // response is sent, killing any unawaited background work.
+  try {
+    await runBackup();
+    res.json({ success: true, data: { message: 'Backup completed' } });
+  } catch (err) {
+    console.error('[Backup] Manual trigger failed:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // ─── Vercel Cron backup trigger ──────────────────────────────
@@ -98,8 +102,16 @@ app.get('/api/v1/backup/run', async (req, res) => {
   if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
-  runBackup().catch(console.error);
-  res.json({ success: true, data: { message: 'Backup started in background' } });
+  // Await so the serverless function stays alive until the backup genuinely
+  // finishes — Vercel freezes/tears down the function right after the
+  // response is sent, killing any unawaited background work.
+  try {
+    await runBackup();
+    res.json({ success: true, data: { message: 'Backup completed' } });
+  } catch (err) {
+    console.error('[Backup] Cron trigger failed:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // ─── 404 ────────────────────────────────────────────────────

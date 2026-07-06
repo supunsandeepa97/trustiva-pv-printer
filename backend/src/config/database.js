@@ -61,6 +61,21 @@ function isConnectionError(err) {
          msg.includes('connection terminated') || msg.includes('server closed');
 }
 
+// Only SELECT statements are safe to serve from the backup DB — it's a one-way,
+// day-old sync target (see backupService.js) that the app never writes back to.
+// Any write that failed over would silently vanish once the primary recovers
+// and traffic flips back (see startRecoveryWatch). Writes must fail loudly instead.
+function isReadOnlyStatement(text) {
+  return typeof text === 'string' && /^\s*select\b/i.test(text);
+}
+
+function writeRejectedError() {
+  return Object.assign(
+    new Error('Primary database is unavailable — write rejected to prevent data loss. Please retry shortly.'),
+    { status: 503 }
+  );
+}
+
 let usingBackup      = false;
 let recoveryInterval = null;
 
@@ -82,40 +97,34 @@ function startRecoveryWatch() {
 // Smart query/connect wrapper used by every controller
 const pool = {
   query: async (text, values) => {
+    const readOnly = isReadOnlyStatement(text);
     if (!usingBackup) {
       try {
         return await primaryPool.query(text, values);
       } catch (err) {
-        if (isConnectionError(err) && backupPool) {
-          console.error('[DB] Primary unreachable — failing over to backup DB:', err.message);
+        if (isConnectionError(err) && backupPool && readOnly) {
+          console.error('[DB] Primary unreachable — failing over to backup DB (read-only):', err.message);
           usingBackup = true;
           startRecoveryWatch();
           return await backupPool.query(text, values);
         }
-        throw err;
-      }
-    }
-    if (!backupPool) throw new Error('Primary DB is down and no backup DB is configured');
-    return backupPool.query(text, values);
-  },
-
-  // Used by controllers that need transactions (e.g. signupRequest)
-  connect: async () => {
-    if (!usingBackup) {
-      try {
-        return await primaryPool.connect();
-      } catch (err) {
-        if (isConnectionError(err) && backupPool) {
-          console.error('[DB] Primary unreachable on connect — failing over to backup DB:', err.message);
-          usingBackup = true;
-          startRecoveryWatch();
-          return await backupPool.connect();
+        if (isConnectionError(err) && !readOnly) {
+          console.error('[DB] Primary unreachable on write — rejecting instead of failing over to stale backup:', err.message);
+          throw writeRejectedError();
         }
         throw err;
       }
     }
+    if (!readOnly) throw writeRejectedError();
     if (!backupPool) throw new Error('Primary DB is down and no backup DB is configured');
-    return backupPool.connect();
+    return backupPool.query(text, values);
+  },
+
+  // Used exclusively by controllers/services running multi-statement transactions
+  // (BEGIN ... COMMIT/ROLLBACK). Transactions always contain writes, so they must
+  // never be served from the stale backup — propagate primary failures immediately.
+  connect: async () => {
+    return primaryPool.connect();
   },
 
   // Expose raw pools for the backup service

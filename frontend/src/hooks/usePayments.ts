@@ -22,23 +22,40 @@ export function usePayments() {
     }
   }, [store, notify]);
 
+  function errMsg(e: unknown, fallback: string) {
+    return (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
+  }
+
   async function updateVoucher(id: string, updates: object) {
-    const { data } = await PaymentAPI.update(id, updates);
-    await fetchVouchers();
-    return data.data;
+    try {
+      const { data } = await PaymentAPI.update(id, updates);
+      await fetchVouchers();
+      return data.data;
+    } catch (e) {
+      notify({ type: 'error', message: errMsg(e, 'Failed to update voucher') });
+      return null;
+    }
   }
 
   async function deleteVoucher(id: string) {
-    await PaymentAPI.delete(id);
-    await fetchVouchers();
-    notify({ type: 'success', message: 'Voucher cancelled' });
+    try {
+      await PaymentAPI.delete(id);
+      await fetchVouchers();
+      notify({ type: 'success', message: 'Voucher cancelled' });
+    } catch (e) {
+      notify({ type: 'error', message: errMsg(e, 'Failed to cancel voucher') });
+    }
   }
 
   async function bulkAction(ids: string[], action: string) {
-    await PaymentAPI.bulkAction(ids, action);
-    store.clearSelected();
-    await fetchVouchers();
-    notify({ type: 'success', message: `Bulk action applied to ${ids.length} vouchers` });
+    try {
+      await PaymentAPI.bulkAction(ids, action);
+      store.clearSelected();
+      await fetchVouchers();
+      notify({ type: 'success', message: `Bulk action applied to ${ids.length} vouchers` });
+    } catch (e) {
+      notify({ type: 'error', message: errMsg(e, 'Bulk action failed') });
+    }
   }
 
   return { ...store, fetchVouchers, updateVoucher, deleteVoucher, bulkAction };

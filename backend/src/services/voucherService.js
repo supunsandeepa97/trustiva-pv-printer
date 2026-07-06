@@ -34,7 +34,7 @@ async function getVouchers(companyId, filters = {}) {
     pool.query(
       `SELECT pv.*, vt.name AS template_name
        FROM payment_vouchers pv
-       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id
+       LEFT JOIN voucher_templates vt ON vt.id = pv.template_id AND vt.company_id = pv.company_id
        WHERE ${where}
        ORDER BY pv.${safeSort} ${safeOrder}
        LIMIT $${p} OFFSET $${p+1}`,
@@ -50,17 +50,30 @@ async function getVoucherById(id, companyId) {
   const result = await pool.query(
     `SELECT pv.*, vt.config AS template_config, vt.name AS template_name, vt.paper_size
      FROM payment_vouchers pv
-     LEFT JOIN voucher_templates vt ON vt.id = pv.template_id
+     LEFT JOIN voucher_templates vt ON vt.id = pv.template_id AND vt.company_id = pv.company_id
      WHERE pv.id = $1 AND pv.company_id = $2`,
     [id, companyId]
   );
   return result.rows[0] || null;
 }
 
+async function assertTemplateOwnership(templateId, companyId, client) {
+  if (!templateId) return;
+  const result = await client.query(
+    'SELECT id FROM voucher_templates WHERE id = $1 AND company_id = $2',
+    [templateId, companyId]
+  );
+  if (!result.rows[0]) {
+    throw Object.assign(new Error('Invalid template_id'), { status: 400 });
+  }
+}
+
 async function createVoucher(data, userId, companyId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    await assertTemplateOwnership(data.template_id, companyId, client);
 
     const amount      = parseFloat(data.amount);
     const date        = parseDate(data.date) || data.date;
@@ -95,6 +108,10 @@ async function updateVoucher(id, data, companyId) {
   const sets    = [];
   const params  = [];
   let p = 1;
+
+  if (data.template_id !== undefined) {
+    await assertTemplateOwnership(data.template_id, companyId, pool);
+  }
 
   for (const key of allowed) {
     if (data[key] !== undefined) {

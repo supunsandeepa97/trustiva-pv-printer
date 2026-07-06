@@ -1,5 +1,6 @@
 const pool = require('../config/database');
-const { success } = require('../utils/apiResponse');
+const { success, error } = require('../utils/apiResponse');
+const { isReservedKey } = require('../utils/reservedSettingsKeys');
 
 async function getSettings(req, res, next) {
   try {
@@ -8,7 +9,7 @@ async function getSettings(req, res, next) {
       [req.user.company_id]
     );
     const settings = {};
-    result.rows.forEach(r => { settings[r.key] = r.value; });
+    result.rows.forEach(r => { if (!isReservedKey(r.key)) settings[r.key] = r.value; });
     return success(res, settings);
   } catch (err) { next(err); }
 }
@@ -17,6 +18,9 @@ async function upsertSettings(req, res, next) {
   try {
     const pairs = Object.entries(req.body);
     if (!pairs.length) return success(res, {});
+    if (pairs.some(([key]) => isReservedKey(key))) {
+      return error(res, 'Invalid setting key', 400);
+    }
 
     const client = await pool.connect();
     try {
